@@ -1,0 +1,61 @@
+{
+  "format": "nebenkostencheck",
+  "formatVersion": 1,
+  "statements": [
+    {
+      "year": 2024,
+      "periodFrom": "2024-01-01",
+      "periodTo": "2024-12-31",
+      "usageFrom": "2024-01-01",
+      "usageTo": "2024-12-31",
+      "issuedOn": "2025-04-16",
+      "receivedOn": "2025-04-16",
+      "dueOn": "2025-05-05",
+      "issuer": "Vermieter (Verwalter: HLV-Schmuker GmbH, Heizkosten: sewatec)",
+      "unit": { "label": "Wohnung 17 · 3 Zi. · 3. OG + Außenstellplatz 11", "livingArea": 79.36, "meaShare": 28.14, "meaTotal": 973 },
+      "positions": [
+        { "label": "Müllgebühren", "category": "muell", "amount": 54.17, "buildingTotal": 1872.89, "allocationKey": "MEA", "share": "28,14 / 973" },
+        { "label": "Hausmeister + Hausreinigung", "category": "hausmeister", "amount": 524.47, "buildingTotal": 18134.81, "allocationKey": "MEA", "share": "28,14 / 973" },
+        { "label": "Hausmeister Stellplätze", "category": "stellplatz", "amount": 70.06, "buildingTotal": 910.77, "allocationKey": "Anzahl Stellplätze", "share": "1 / 13" },
+        { "label": "Gebäudeversicherung", "category": "versicherung", "amount": 188.42, "buildingTotal": 6514.99, "allocationKey": "MEA", "share": "28,14 / 973" },
+        { "label": "Heizkosten", "category": "heizung", "amount": 606.24, "allocationKey": "HK-Abrechnung 30/70", "share": "79,36 m² / 3.253 kWh", "source": "Heizkostenabrechnung" },
+        { "label": "Warmwasserkosten", "category": "warmwasser", "amount": 808.31, "allocationKey": "HK-Abrechnung 30/70", "share": "79,36 m² / 48,545 m³", "source": "Heizkostenabrechnung" },
+        { "label": "Wasser/Abwasser", "category": "wasser", "amount": 499.97, "buildingTotal": 9048.82, "allocationKey": "m³ Wasser", "share": "132,66 m³", "source": "Heizkostenabrechnung" },
+        { "label": "Abrechnungsservice Kaltwasser", "category": "wasser", "amount": 8.75, "allocationKey": "Anzahl Zähler", "share": "1 / 45", "source": "Heizkostenabrechnung" },
+        { "label": "Wartung/Miete Kaltwasserzähler", "category": "wasser", "amount": 11.36, "allocationKey": "Anzahl Zähler", "share": "1 / 45", "source": "Heizkostenabrechnung" },
+        { "label": "Wartung Rauchwarnmelder", "category": "wartung", "amount": 8.27, "allocationKey": "Anzahl RWM", "share": "3 / 92", "source": "Heizkostenabrechnung" },
+        { "label": "Entwässerung", "category": "wasser", "amount": 10.62, "buildingTotal": 377.37, "allocationKey": "MEA gesamt", "share": "28,14 / 1000" },
+        { "label": "Wartung Gemeinschaftsanlagen", "category": "wartung", "amount": 16.03, "buildingTotal": 554.34, "allocationKey": "MEA", "share": "28,14 / 973" },
+        { "label": "Aufzug Wartung/TÜV/Notruf", "category": "aufzug", "amount": 78.64, "buildingTotal": 2719.15, "allocationKey": "MEA", "share": "28,14 / 973" },
+        { "label": "Allgemeinstrom", "category": "strom", "amount": 69.43, "buildingTotal": 2400.63, "allocationKey": "MEA", "share": "28,14 / 973" },
+        { "label": "Kabelgebühr", "category": "kabel", "amount": 69.97, "buildingTotal": 2588.94, "allocationKey": "Wohneinheiten", "share": "1 / 37" },
+        { "label": "Grundsteuer", "category": "grundsteuer", "amount": 300.87, "allocationKey": "direkt", "share": "zeitanteilig" }
+      ],
+      "totals": { "costs": 3325.58, "prepayments": 2655.00, "balance": -670.58 },
+      "prepaymentSchedule": [ { "months": 9, "monthly": 205 }, { "months": 3, "monthly": 270 } ],
+      "consumption": {
+        "heatingKwh": 3253,
+        "hotWaterM3": 48.545,
+        "hotWaterKwh": 2822.89,
+        "coldWaterM3": 84.115,
+        "waterTotalM3": 132.66,
+        "heatingKwhPerM2": 40.99,
+        "heatingKwhPerM2Building": 39.92,
+        "hotWaterKwhPerM2": 35.57,
+        "hotWaterKwhPerM2Building": 14.14,
+        "co2CostTenant": 69.83,
+        "energyPricePerKwh": 0.1653
+      },
+      "consumptionHistory": [
+        { "year": 2022, "heatingKwh": 2364, "hotWaterKwh": 1890.16 },
+        { "year": 2023, "heatingKwh": 2918, "hotWaterKwh": 2351.87 }
+      ],
+      "tax35a": { "householdServices": 544.31, "craftsmenServices": 126.17 },
+      "notes": [
+        "Fernwärme, Kosten Heizanlage gesamt 30.300,39 €, Liegenschaft 43.967,06 €",
+        "CO2-Kosten Stufe 1 (6,6 kg/m²): 100 % Mieter, dein Anteil 69,83 €"
+      ]
+    }
+  ],
+  "contracts": []
+}

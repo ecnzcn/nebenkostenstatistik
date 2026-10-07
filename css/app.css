@@ -338,3 +338,4 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 /* Geschätzte Vertragsjahre */
 .legend i.est { background: color-mix(in srgb, var(--c7) 35%, transparent); border: 1.5px dashed var(--c7); border-radius: 3px; }
 .tbl tr.est-row td { color: var(--text-2); }
+@media (max-width: 600px) { .tbl.fix { font-size: 13px; } .tbl.fix td, .tbl.fix th { padding-left: 3px; padding-right: 3px; } }

@@ -2,10 +2,20 @@
 // Bei jeder Änderung: APP_VERSION erhöhen, Eintrag oben in CHANGELOG ergänzen
 // und CACHE_VERSION in sw.js angleichen (sonst sieht das iPhone die neue Version nicht).
 
-export const APP_VERSION = '1.1.0';
+export const APP_VERSION = '1.2.0';
 export const DATA_FORMAT_VERSION = 1;
 
 export const CHANGELOG = [
+  {
+    version: '1.2.0',
+    date: '2026-10-07',
+    title: 'Neues App-Icon & Fixkosten-Übersicht',
+    changes: [
+      'Neues App-Icon (Home-Bildschirm, Seitenleiste, Favicon)',
+      'Gesamte Fixkosten: Jahre untereinander (neuestes oben) statt seitlich scrollen, mit Monatswerten',
+      'Jahre nach der letzten Abrechnung zeigen die laufende Vorauszahlung (z. B. 270 €/Monat) statt „–“',
+    ],
+  },
   {
     version: '1.1.0',
     date: '2026-10-07',

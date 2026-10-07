@@ -230,6 +230,18 @@ function viewDashboard() {
   </div>`;
 }
 
+// Nebenkosten eines Jahres: Abrechnung, sonst (nach der letzten Abrechnung) laufende Vorauszahlung × 12.
+function nebenkostenForYear(y) {
+  const st = store.statement(y);
+  if (st) return { value: st.totals.costs, kind: 'abrechnung' };
+  const sts = store.statements();
+  const last = sts[sts.length - 1];
+  if (!last || y < last.year || y > new Date().getFullYear()) return null;
+  const sched = last.prepaymentSchedule;
+  const monthly = sched.length ? sched[sched.length - 1].monthly : (last.totals.prepayments || 0) / 12;
+  return monthly ? { value: monthly * 12, monthly, kind: 'vorauszahlung' } : null;
+}
+
 function consumptionSeries(uptoYear) {
   const map = new Map();
   for (const s of store.statements()) {
@@ -532,8 +544,8 @@ function viewStats() {
   const cats = Object.keys(CATEGORIES).filter((k) => sts.some((s) => s.positions.some((p) => p.category === k)));
   const catSum = (s, k) => s.positions.filter((p) => p.category === k).reduce((a, p) => a + p.amount, 0);
   const cs = store.contracts();
-  const ys = [...sts.map((s) => s.year), ...contractsYears(cs)];
-  const allYears = ys.length ? Array.from({ length: Math.max(...ys) - Math.min(...ys) + 1 }, (_, i) => Math.min(...ys) + i) : [];
+  const ys = [...sts.map((s) => s.year), ...contractsYears(cs), ...(sts.length ? [new Date().getFullYear()] : [])];
+  const fixYears = ys.length ? Array.from({ length: Math.max(...ys) - Math.min(...ys) + 1 }, (_, i) => Math.min(...ys) + i) : [];
   afterRender.push(() => {
     lineChart($('#ch-s1'), { labels: sts.map((s) => String(s.year)), unit: '€/m²', series: [
       { name: 'Kosten pro m²', color: 'var(--c3)', values: sts.map((s) => (s.unit.livingArea ? s.totals.costs / s.unit.livingArea : null)) },
@@ -558,12 +570,16 @@ function viewStats() {
         <tfoot><tr><td>Gesamt</td>${sts.map((s) => `<td class="r">${eur(s.totals.costs)}</td>`).join('')}${sts.length > 1 ? `<td class="r">${delta(((sts[sts.length - 1].totals.costs - sts[sts.length - 2].totals.costs) / sts[sts.length - 2].totals.costs) * 100)}</td>` : ''}</tr>
         <tr><td>Vorauszahlungen</td>${sts.map((s) => `<td class="r">${eur(s.totals.prepayments)}</td>`).join('')}${sts.length > 1 ? '<td></td>' : ''}</tr></tfoot>
       </table></div></section>
-    ${cs.length ? `<section class="card span3"><div class="card-head"><h2>Gesamte Fixkosten (Nebenkosten + Verträge)</h2></div>
-      <div class="scroll-x"><table class="tbl"><thead><tr><th></th>${allYears.map((y) => `<th class="r">${y}</th>`).join('')}</tr></thead><tbody>
-      <tr><td>Nebenkosten</td>${allYears.map((y) => `<td class="r">${store.statement(y) ? eur(store.statement(y).totals.costs) : '–'}</td>`).join('')}</tr>
-      <tr><td>Verträge</td>${allYears.map((y) => `<td class="r">${eur(contractsTotal(cs, y))}${contractsHasEstimate(cs, y) ? '*' : ''}</td>`).join('')}</tr></tbody>
-      <tfoot><tr><td>Summe</td>${allYears.map((y) => `<td class="r">${eur((store.statement(y)?.totals.costs || 0) + contractsTotal(cs, y))}</td>`).join('')}</tr></tfoot></table></div>
-      ${allYears.some((y) => contractsHasEstimate(cs, y)) ? '<p class="small muted">* enthält geschätzte Vertragskosten (ab Vertragsbeginn)</p>' : ''}</section>` : ''}
+    ${cs.length ? `<section class="card span3"><div class="card-head"><h2>Gesamte Fixkosten</h2><span class="small muted">Nebenkosten + Verträge</span></div>
+      <table class="tbl fix"><thead><tr><th>Jahr</th><th class="r">Nebenkosten</th><th class="r">Verträge</th><th class="r">Summe</th></tr></thead><tbody>
+      ${fixYears.slice().reverse().map((y) => {
+        const nk = nebenkostenForYear(y), ct = contractsTotal(cs, y), est = contractsHasEstimate(cs, y);
+        return `<tr><td><b>${y}</b></td>
+          <td class="r">${nk ? eur(nk.value) + (nk.kind === 'vorauszahlung' ? '¹' : '') : '–'}<div class="small muted">${nk ? (nk.kind === 'abrechnung' ? 'Abrechnung' : eur(nk.monthly, 0) + ' mtl.') : 'keine Abrechnung'}</div></td>
+          <td class="r">${eur(ct)}${est ? '*' : ''}<div class="small muted">${eur(ct / 12, 0)} mtl.</div></td>
+          <td class="r"><b>${eur((nk?.value || 0) + ct)}</b><div class="small muted">${eur(((nk?.value || 0) + ct) / 12, 0)} mtl.</div></td></tr>`;
+      }).join('')}</tbody></table>
+      <p class="small muted">${fixYears.some((y) => nebenkostenForYear(y)?.kind === 'vorauszahlung') ? '¹ noch keine Abrechnung – laufende Vorauszahlung laut letzter Abrechnung × 12.<br>' : ''}${fixYears.some((y) => contractsHasEstimate(cs, y)) ? '* enthält geschätzte Vertragskosten (ab Vertragsbeginn).<br>' : ''}${fixYears.some((y) => !nebenkostenForYear(y)) ? '„keine Abrechnung“: Für diese Jahre liegt keine Nebenkostenabrechnung vor – einfach über „Import“ nachtragen.' : ''}</p></section>` : ''}
   </div>`;
 }
 

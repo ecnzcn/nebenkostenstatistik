@@ -21,6 +21,10 @@ function load() {
     const raw = localStorage.getItem(KEY);
     if (!raw) return empty();
     const s = JSON.parse(raw);
+    // Migration v1.1: übernommene Schätzungen waren nur über die Notiz erkennbar
+    for (const c of s.contracts || []) for (const y of c.years || []) {
+      if (y.note === 'aus Schätzung übernommen') { y.fromEstimate = true; y.note = ''; }
+    }
     return { ...empty(), ...s, settings: { ...empty().settings, ...(s.settings || {}) } };
   } catch {
     return empty();

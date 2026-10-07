@@ -23,3 +23,4 @@ Link in Safari öffnen → Teilen → „Zum Home-Bildschirm“.
 
 ## Entwicklung
 Kein Build-Schritt. Lokal starten: `python3 -m http.server` und http://localhost:8000 öffnen.
+Tests der Rechenlogik: `npm test`. Aufbau und Weg zur nativen iOS-App: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

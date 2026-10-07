@@ -144,22 +144,75 @@ export function analyze(st, prev, all) {
     if (high.length) insights.push({ level: 'info', title: 'Über bundesweitem Richtwert', text: high.join(' · ') + ' pro Monat.' });
   }
 
-  // Vorauszahlungs-Prognose
-  const sched = st.prepaymentSchedule;
-  if (sched.length) {
-    const current = sched[sched.length - 1].monthly;
-    // Kabel-TV entfällt ab 2025 vollständig
-    const expected = st.totals.costs - (st.year >= 2024 ? cat.kabel || 0 : 0);
-    const yearly = current * 12;
-    const diff = yearly - expected;
-    const suggest = Math.ceil(expected / 12 / 5) * 5;
-    insights.push({ level: diff < -50 ? 'warning' : diff < 0 ? 'info' : 'good', title: `Prognose ${st.year + 1}`,
-      text: `Bei aktuell ${eur(current, 0)} Vorauszahlung im Monat (${eur(yearly, 0)}/Jahr) und gleichen Kosten ` +
+  // Prognose für das Folgejahr
+  const fc = forecastNext((all || [st]).filter((x) => x.year <= st.year));
+  if (fc && fc.monthly) {
+    const diff = fc.balance;
+    const suggest = Math.ceil(fc.total / 12 / 5) * 5;
+    insights.push({ level: diff < -50 ? 'warning' : diff < 0 ? 'info' : 'good', title: `Prognose ${fc.year}`,
+      text: `Erwartete Kosten ca. ${eur(fc.total, 0)} (${fc.method}). Bei ${eur(fc.monthly, 0)} Vorauszahlung im Monat (${eur(fc.prepayments, 0)}/Jahr) ` +
         (diff >= 0 ? `ergibt sich voraussichtlich ein Guthaben von ca. ${eur(diff, 0)}.`
           : `droht eine Nachzahlung von ca. ${eur(-diff, 0)}. Passend wären ca. ${eur(suggest, 0)} im Monat.`) });
   }
 
   return { summary, drivers, insights };
+}
+
+// Prognose für das Jahr nach der letzten Abrechnung.
+// Basis: letzte Abrechnung, ohne Kabel-TV (ab 2025 nicht mehr umlagefähig),
+// fortgeschrieben mit dem durchschnittlichen Trend der Vorjahre (begrenzt auf ±8 %).
+export function forecastNext(statements) {
+  const sts = [...statements].sort((a, b) => a.year - b.year);
+  if (!sts.length) return null;
+  const last = sts[sts.length - 1];
+  const year = last.year + 1;
+  const kabel = (x) => (categoryTotals(x).kabel || 0);
+  const base = (x) => x.totals.costs - kabel(x);
+  const heatOf = (x) => { const g = groupTotals(x); return g.heizung + g.warmwasser; };
+  const trend = (fn) => {
+    const ch = [];
+    for (let i = 1; i < sts.length; i++) {
+      if (sts[i].year === sts[i - 1].year + 1 && fn(sts[i - 1]) > 0) ch.push(fn(sts[i]) / fn(sts[i - 1]) - 1);
+    }
+    if (!ch.length) return 0;
+    const m = ch.reduce((a, b) => a + b, 0) / ch.length;
+    return Math.max(-0.08, Math.min(0.08, m));
+  };
+  const dropKabel = year >= 2025 && kabel(last) > 0;
+  const g = trend(base), gh = trend(heatOf);
+  const total = Math.round((dropKabel ? base(last) : last.totals.costs) * (1 + g) * 100) / 100;
+  const heat = Math.round(heatOf(last) * (1 + gh) * 100) / 100;
+  const sched = last.prepaymentSchedule || [];
+  const monthly = sched.length ? sched[sched.length - 1].monthly : (last.totals.prepayments || 0) / 12;
+  const intervals = sts.length - 1;
+  const method = (g ? `Trend ${pct(g * 100)} pro Jahr aus ${intervals + 1} Abrechnungen` : `Kosten wie ${last.year}`) +
+    (dropKabel ? ', ohne Kabel-TV' : '');
+  return { year, total, heat, growth: g, heatGrowth: gh, monthly, prepayments: monthly * 12,
+    balance: Math.round((monthly * 12 - total) * 100) / 100, dropKabel, method };
+}
+
+// Nebenkosten eines Jahres: Abrechnung, sonst (nach der letzten Abrechnung) laufende Vorauszahlung × 12.
+export function nebenkostenForYear(statements, y, now = new Date()) {
+  const sts = [...statements].sort((a, b) => a.year - b.year);
+  const st = sts.find((x) => x.year === y);
+  if (st) return { value: st.totals.costs, kind: 'abrechnung' };
+  const last = sts[sts.length - 1];
+  if (!last || y < last.year || y > now.getFullYear()) return null;
+  const sched = last.prepaymentSchedule || [];
+  const monthly = sched.length ? sched[sched.length - 1].monthly : (last.totals.prepayments || 0) / 12;
+  return monthly ? { value: monthly * 12, monthly, kind: 'vorauszahlung' } : null;
+}
+
+// Verbrauchswerte je Jahr (inkl. Vorjahreswerten aus den Grafiken der Abrechnungen).
+export function consumptionSeries(statements, uptoYear) {
+  const map = new Map();
+  for (const s of statements) for (const h of s.consumptionHistory || []) if (!map.has(h.year)) map.set(h.year, { ...h });
+  for (const s of statements) {
+    const old = map.get(s.year) || {};
+    map.set(s.year, { year: s.year, heatingKwh: s.consumption.heatingKwh ?? old.heatingKwh ?? null,
+      hotWaterKwh: s.consumption.hotWaterKwh ?? old.hotWaterKwh ?? null, waterTotalM3: s.consumption.waterTotalM3 ?? old.waterTotalM3 ?? null });
+  }
+  return [...map.values()].filter((r) => r.year <= uptoYear).sort((a, b) => a.year - b.year);
 }
 
 export function tax35a(st) {
@@ -171,7 +224,7 @@ export function tax35a(st) {
 const r2 = (n) => Math.round(n * 100) / 100;
 
 // Aktive Monate eines Vertrags im Jahr (1–12), anhand Beginn und – bei beendeten Verträgen – Ende.
-function monthsActive(c, year) {
+export function monthsActive(c, year) {
   const start = c.startDate ? new Date(c.startDate + 'T12:00:00') : null;
   const end = !c.active && c.endDate ? new Date(c.endDate + 'T12:00:00') : null;
   let from = 0, to = 11;
@@ -181,11 +234,12 @@ function monthsActive(c, year) {
 }
 
 // Erfasste Jahre + geschätzte Jahre seit Vertragsbeginn (Monatsbetrag aus dem nächstgelegenen erfassten Jahr).
-export function contractTimeline(c) {
+export function contractTimeline(c, now) {
+  now = now || new Date();
   const explicit = c.years.map((y) => ({ ...y, estimated: false }));
   if (!c.startDate || !explicit.length) return explicit;
   const startY = new Date(c.startDate + 'T12:00:00').getFullYear();
-  const curY = new Date().getFullYear();
+  const curY = now.getFullYear();
   const endY = !c.active && c.endDate ? Math.min(curY, new Date(c.endDate + 'T12:00:00').getFullYear()) : curY;
   const have = new Set(explicit.map((y) => y.year));
   const out = [...explicit];
@@ -198,12 +252,12 @@ export function contractTimeline(c) {
     const refMonths = monthsActive(c, ref.year) || 12;
     const monthly = ref.cost / refMonths;
     out.push({ year: y, cost: r2(monthly * months), tariff: ref.tariff, provider: ref.provider, benchmark: null,
-      benchmarkNote: '', note: months < 12 ? `${months} Monate` : '', estimated: true, months });
+      benchmarkNote: '', note: '', estimated: true, months });
   }
   return out.sort((a, b) => a.year - b.year);
 }
 
-export function contractYear(c, year) { return contractTimeline(c).find((y) => y.year === year); }
+export function contractYear(c, year, now) { return contractTimeline(c, now).find((y) => y.year === year); }
 
 export function rateContractYear(y) {
   if (!y || y.benchmark == null || !y.cost) return null;
@@ -214,25 +268,24 @@ export function rateContractYear(y) {
   return { level: 'critical', label: 'Zu teuer', over, p };
 }
 
-export function contractsYears(contracts) {
+export function contractsYears(contracts, now) {
   const s = new Set();
-  contracts.forEach((c) => contractTimeline(c).forEach((y) => s.add(y.year)));
+  contracts.forEach((c) => contractTimeline(c, now).forEach((y) => s.add(y.year)));
   return [...s].sort((a, b) => a - b);
 }
 
-export function contractsTotal(contracts, year) {
-  return contracts.reduce((a, c) => a + (contractYear(c, year)?.cost || 0), 0);
+export function contractsTotal(contracts, year, now) {
+  return contracts.reduce((a, c) => a + (contractYear(c, year, now)?.cost || 0), 0);
 }
 
-export function contractsHasEstimate(contracts, year) {
-  return contracts.some((c) => contractYear(c, year)?.estimated);
+export function contractsHasEstimate(contracts, year, now) {
+  return contracts.some((c) => contractYear(c, year, now)?.estimated);
 }
 
 // Nächstmöglicher Kündigungstermin
-export function noticeInfo(c) {
+export function noticeInfo(c, now = new Date()) {
   if (!c.endDate || !c.active) return null;
   let end = new Date(c.endDate + 'T12:00:00');
-  const now = new Date();
   const renew = c.autoRenewMonths || 12;
   let guard = 0;
   while (end < now && guard++ < 50) end.setMonth(end.getMonth() + renew);

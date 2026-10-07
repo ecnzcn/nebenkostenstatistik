@@ -2,10 +2,27 @@
 // Bei jeder Änderung: APP_VERSION erhöhen, Eintrag oben in CHANGELOG ergänzen
 // und CACHE_VERSION in sw.js angleichen (sonst sieht das iPhone die neue Version nicht).
 
-export const APP_VERSION = '1.2.0';
+export const APP_VERSION = '1.3.0';
 export const DATA_FORMAT_VERSION = 1;
 
 export const CHANGELOG = [
+  {
+    version: '1.3.0',
+    date: '2026-10-07',
+    title: 'Prognose, Erinnerungen & Hell/Dunkel',
+    changes: [
+      'Kostenentwicklung zeigt eine gestrichelte Prognose für das Folgejahr (Trend der Vorjahre, ohne Kabel-TV)',
+      'Kündigungs-Erinnerung als Kalendertermin (30/7/1 Tag vorher) + Hinweis im Dashboard 60 Tage vorher',
+      'Erinnerung an die Einwendungsfrist einer Abrechnung als Kalendertermin',
+      'Verträge: Tortendiagramm nach Kategorie und „Kategorien im Vergleich“ über die Jahre',
+      'Schätzungen übernehmen lässt sich rückgängig machen (sofort im Hinweis oder später per Button)',
+      'Günstigstes Angebot und Kosten auch pro Monat eingeben – Jahr wird automatisch umgerechnet',
+      'Darstellung wählbar: Automatisch, Hell oder Dunkel (unter „Mehr“)',
+      'Gesamte Fixkosten zeigt die letzten 3 Jahre, ältere per „Ältere Jahre anzeigen“',
+      'Behoben: überlappende Jahreszahlen in Diagrammen, Verlauf-Tabelle ragte heraus, iOS-Teilen-Symbol',
+      'Architektur für eine spätere native iOS-App vorbereitet (Schema, Golden-Tests, Swift-Modelle)',
+    ],
+  },
   {
     version: '1.2.0',
     date: '2026-10-07',

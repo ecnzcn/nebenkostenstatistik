@@ -1,0 +1,289 @@
+{
+  "statement2024": {
+    "groupTotals": {
+      "wasser": 530.7,
+      "heizung": 606.24,
+      "hausmeister": 524.47,
+      "warmwasser": 808.31,
+      "grundsteuer": 300.87,
+      "muell": 54.17,
+      "versicherung": 188.42,
+      "sonstiges": 312.4
+    },
+    "categoryTotals": {
+      "muell": 54.17,
+      "hausmeister": 524.47,
+      "stellplatz": 70.06,
+      "versicherung": 188.42,
+      "heizung": 606.24,
+      "warmwasser": 808.31,
+      "wasser": 530.7,
+      "wartung": 24.3,
+      "aufzug": 78.64,
+      "strom": 69.43,
+      "kabel": 69.97,
+      "grundsteuer": 300.87
+    },
+    "kpis": {
+      "total": 3325.58,
+      "heat": 1414.55,
+      "water": 530.7,
+      "perM2": 41.9,
+      "perMonth": 277.13,
+      "balance": -670.58
+    },
+    "tax35a": {
+      "household": 544.31,
+      "craftsmen": 126.17,
+      "reduction": 134.1
+    },
+    "forecast": {
+      "year": 2025,
+      "total": 3255.61,
+      "heat": 1414.55,
+      "growth": 0,
+      "heatGrowth": 0,
+      "monthly": 270,
+      "prepayments": 3240,
+      "balance": -15.61,
+      "dropKabel": true,
+      "method": "Kosten wie 2024, ohne Kabel-TV"
+    },
+    "consumption": [
+      {
+        "year": 2022,
+        "heatingKwh": 2364,
+        "hotWaterKwh": 1890.16,
+        "waterTotalM3": null
+      },
+      {
+        "year": 2023,
+        "heatingKwh": 2918,
+        "hotWaterKwh": 2351.87,
+        "waterTotalM3": null
+      },
+      {
+        "year": 2024,
+        "heatingKwh": 3253,
+        "hotWaterKwh": 2822.89,
+        "waterTotalM3": 132.66
+      }
+    ],
+    "nebenkostenForYear": {
+      "2023": null,
+      "2024": {
+        "value": 3325.58,
+        "kind": "abrechnung"
+      },
+      "2025": {
+        "value": 3240,
+        "monthly": 270,
+        "kind": "vorauszahlung"
+      },
+      "2026": {
+        "value": 3240,
+        "monthly": 270,
+        "kind": "vorauszahlung"
+      },
+      "2027": null
+    }
+  },
+  "contracts": {
+    "netflix": {
+      "timeline": [
+        {
+          "year": 2023,
+          "cost": 54.89,
+          "estimated": true,
+          "months": 11,
+          "benchmark": null,
+          "rating": null
+        },
+        {
+          "year": 2024,
+          "cost": 59.88,
+          "estimated": true,
+          "months": 12,
+          "benchmark": null,
+          "rating": null
+        },
+        {
+          "year": 2025,
+          "cost": 59.88,
+          "estimated": true,
+          "months": 12,
+          "benchmark": null,
+          "rating": null
+        },
+        {
+          "year": 2026,
+          "cost": 59.88,
+          "estimated": false,
+          "months": null,
+          "benchmark": 71.88,
+          "rating": "Gut gewählt"
+        }
+      ],
+      "notice": null
+    },
+    "adac": {
+      "timeline": [
+        {
+          "year": 2014,
+          "cost": 34.75,
+          "estimated": true,
+          "months": 3,
+          "benchmark": null,
+          "rating": null
+        },
+        {
+          "year": 2015,
+          "cost": 139,
+          "estimated": true,
+          "months": 12,
+          "benchmark": null,
+          "rating": null
+        },
+        {
+          "year": 2016,
+          "cost": 139,
+          "estimated": true,
+          "months": 12,
+          "benchmark": null,
+          "rating": null
+        },
+        {
+          "year": 2017,
+          "cost": 139,
+          "estimated": true,
+          "months": 12,
+          "benchmark": null,
+          "rating": null
+        },
+        {
+          "year": 2018,
+          "cost": 139,
+          "estimated": true,
+          "months": 12,
+          "benchmark": null,
+          "rating": null
+        },
+        {
+          "year": 2019,
+          "cost": 139,
+          "estimated": true,
+          "months": 12,
+          "benchmark": null,
+          "rating": null
+        },
+        {
+          "year": 2020,
+          "cost": 139,
+          "estimated": true,
+          "months": 12,
+          "benchmark": null,
+          "rating": null
+        },
+        {
+          "year": 2021,
+          "cost": 139,
+          "estimated": true,
+          "months": 12,
+          "benchmark": null,
+          "rating": null
+        },
+        {
+          "year": 2022,
+          "cost": 139,
+          "estimated": true,
+          "months": 12,
+          "benchmark": null,
+          "rating": null
+        },
+        {
+          "year": 2023,
+          "cost": 139,
+          "estimated": true,
+          "months": 12,
+          "benchmark": null,
+          "rating": null
+        },
+        {
+          "year": 2024,
+          "cost": 139,
+          "estimated": false,
+          "months": null,
+          "benchmark": null,
+          "rating": null
+        },
+        {
+          "year": 2025,
+          "cost": 139,
+          "estimated": true,
+          "months": 12,
+          "benchmark": null,
+          "rating": null
+        },
+        {
+          "year": 2026,
+          "cost": 149,
+          "estimated": false,
+          "months": null,
+          "benchmark": null,
+          "rating": null
+        }
+      ],
+      "notice": {
+        "end": "2026-10-07",
+        "lastNotice": "2026-09-07",
+        "days": -30
+      }
+    },
+    "alt": {
+      "timeline": [
+        {
+          "year": 2019,
+          "cost": 319.6,
+          "estimated": true,
+          "months": 8,
+          "benchmark": null,
+          "rating": null
+        },
+        {
+          "year": 2020,
+          "cost": 479.4,
+          "estimated": false,
+          "months": null,
+          "benchmark": 240,
+          "rating": "Zu teuer"
+        },
+        {
+          "year": 2021,
+          "cost": 479.4,
+          "estimated": true,
+          "months": 12,
+          "benchmark": null,
+          "rating": null
+        },
+        {
+          "year": 2022,
+          "cost": 159.8,
+          "estimated": true,
+          "months": 4,
+          "benchmark": null,
+          "rating": null
+        }
+      ],
+      "notice": null
+    }
+  },
+  "contractsTotal": {
+    "2014": 34.75,
+    "2015": 139,
+    "2020": 618.4,
+    "2023": 193.89,
+    "2024": 198.88,
+    "2025": 198.88,
+    "2026": 208.88
+  }
+}

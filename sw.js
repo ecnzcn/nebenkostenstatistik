@@ -1,9 +1,9 @@
 // Offline-Cache. CACHE_VERSION bei jedem Release erhöhen (= APP_VERSION in js/version.js).
-const CACHE_VERSION = '1.2.0';
+const CACHE_VERSION = '1.3.0';
 const CACHE = 'nebenkostencheck-' + CACHE_VERSION;
 const ASSETS = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
-  'js/app.js', 'js/model.js', 'js/store.js', 'js/analysis.js', 'js/charts.js', 'js/version.js',
+  'js/app.js', 'js/model.js', 'js/store.js', 'js/analysis.js', 'js/charts.js', 'js/version.js', 'js/calendar.js',
   'icons/icon-rounded.png', 'icons/favicon-64.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
   'data/abrechnung-2024.json', 'docs/CLAUDE_PROMPT.md',
 ];

@@ -1,7 +1,9 @@
 import { APP_VERSION, CHANGELOG } from './version.js';
 import { store } from './store.js';
-import { GROUPS, CATEGORIES, CONTRACT_CATEGORIES, groupTotals, parseImport, normalizeContract, uid } from './model.js';
-import { kpis, analyze, eur, pct, numf, dateDe, tax35a, contractYear, contractTimeline, rateContractYear, contractsYears, contractsTotal, contractsHasEstimate, noticeInfo } from './analysis.js';
+import { GROUPS, CATEGORIES, CONTRACT_CATEGORIES, CONTRACT_COLORS, contractColor, groupTotals, parseImport, normalizeContract, uid } from './model.js';
+import { kpis, analyze, eur, pct, numf, dateDe, tax35a, contractYear, contractTimeline, rateContractYear, contractsYears, contractsTotal, contractsHasEstimate, noticeInfo,
+  forecastNext, monthsActive, nebenkostenForYear as nkForYear, consumptionSeries as consSeries } from './analysis.js';
+import { buildIcs } from './calendar.js';
 import { lineChart, barChart, donut, sparkline, installTooltip } from './charts.js';
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -26,13 +28,19 @@ const ICONS = {
   plus: '<path d="M12 5v14M5 12h14"/>',
   back: '<path d="M15 5l-7 7 7 7"/>',
   chev: '<path d="M9 5l7 7-7 7"/>',
+  bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+  undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+  cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  share: '<path d="M12 3v12M8 7l4-4 4 4"/><path d="M8 11H6a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-2"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
 };
 const icon = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]}</svg>`;
 const statusIcon = { good: 'check', warning: 'warn', critical: 'warn', info: 'info' };
 
-function toast(msg, ms = 2600) {
+function toast(msg, ms = 2600, action = null) {
   const t = $('#toast');
-  t.innerHTML = msg;
+  t.innerHTML = msg + (action ? ` <button class="toast-btn">${esc(action.label)}</button>` : '');
+  if (action) t.querySelector('.toast-btn').onclick = () => { t.classList.remove('show'); action.run(); };
   t.classList.add('show');
   clearTimeout(t._h);
   t._h = setTimeout(() => t.classList.remove('show'), ms);
@@ -45,6 +53,23 @@ function delta(p, invert = true, label = '') {
   const cls = up ? (invert ? 'bad' : 'good') : down ? (invert ? 'good' : 'bad') : 'muted';
   return `<span class="delta ${cls}">${up ? '↑' : down ? '↓' : '→'} ${pct(p)}${label ? ` <span class="muted">${label}</span>` : ''}</span>`;
 }
+
+// ---------- Darstellung (hell / dunkel / automatisch) ----------
+const THEME_KEY = 'nebenkostencheck.theme';
+function getTheme() { try { return localStorage.getItem(THEME_KEY) || 'auto'; } catch { return 'auto'; } }
+function setTheme(t) {
+  try { localStorage.setItem(THEME_KEY, t); } catch {}
+  applyTheme();
+  render();
+}
+function applyTheme() {
+  const t = getTheme();
+  if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+  const dark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', dark ? '#0f1420' : '#f3f6fb'));
+  document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.setAttribute('content', dark ? 'black' : 'default');
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { applyTheme(); render(); });
 
 // ---------- Router ----------
 const routes = [
@@ -123,12 +148,14 @@ function viewDashboard() {
   const vj = prev ? `zu ${prev.year}` : '';
 
   afterRender.push(() => {
+    const withFc = fc ? [...sts, null] : sts;
     lineChart($('#ch-trend'), {
-      labels: sts.map((s) => String(s.year)),
+      labels: withFc.map((s) => String(s ? s.year : fc.year)),
       series: [
-        { name: 'Gesamtkosten', color: 'var(--c1)', values: sts.map((s) => s.totals.costs) },
-        { name: 'Heizung + Warmwasser', color: 'var(--c2)', values: sts.map((s) => { const x = groupTotals(s); return x.heizung + x.warmwasser; }) },
+        { name: 'Gesamtkosten', color: 'var(--c1)', values: withFc.map((s) => (s ? s.totals.costs : fc.total)) },
+        { name: 'Heizung + Warmwasser', color: 'var(--c2)', values: withFc.map((s) => { if (!s) return fc.heat; const x = groupTotals(s); return x.heizung + x.warmwasser; }) },
       ],
+      forecastFrom: fc ? sts.length : null,
     });
     const slices = GROUPS.map((x) => ({ label: x.label, value: g[x.key], color: x.color }));
     donut($('#ch-donut'), { slices, center: eur(st.totals.costs, 0), sub: 'Gesamt' });
@@ -155,6 +182,9 @@ function viewDashboard() {
   }
 
   const rows = GROUPS.map((x) => ({ ...x, v: g[x.key], p: pg ? pg[x.key] : null })).filter((r) => r.v > 0 || (r.p ?? 0) > 0);
+  // Prognose nur, wenn das gewählte Jahr die neueste Abrechnung ist
+  const fc = year === sts[sts.length - 1].year ? forecastNext(sts) : null;
+  const dueSoon = store.contracts().map((c) => ({ c, n: noticeInfo(c) })).filter((x) => x.n && x.n.days >= 0 && x.n.days <= 60);
   const avg = sts.reduce((s, x) => s + x.totals.costs, 0) / sts.length;
 
   return `
@@ -162,6 +192,7 @@ function viewDashboard() {
     <div><h1>Dashboard</h1><p class="sub">Deine Nebenkosten auf einen Blick</p></div>
     <label class="year-pick">${icon('doc')}<select id="year-sel" aria-label="Jahr">${sts.slice().reverse().map((s) => `<option ${s.year === year ? 'selected' : ''}>${s.year}</option>`).join('')}</select></label>
   </header>
+  ${dueSoon.map(({ c, n }) => `<a class="insight warning reminder" href="#/vertrag/${c.id}">${icon('bell')}<div><b>Kündigung: ${esc(c.name)}</b><p>Spätestens bis ${n.lastNotice.toLocaleDateString('de-DE')} kündigen (noch ${n.days} Tage).</p></div></a>`).join('')}
   ${st.unit.label ? `<p class="unit-line">${icon('home')} ${esc(st.unit.label)}${st.unit.livingArea ? ` · ${numf(st.unit.livingArea, 2)} m²` : ''}</p>` : ''}
 
   <section class="kpis">
@@ -195,9 +226,9 @@ function viewDashboard() {
 
     <section class="card span2">
       <div class="card-head"><h2>Kostenentwicklung</h2>
-        <div class="legend"><span><i style="background:var(--c1)"></i>Gesamtkosten</span><span><i style="background:var(--c2)"></i>Heizung + Warmwasser</span></div></div>
+        <div class="legend"><span><i style="background:var(--c1)"></i>Gesamtkosten</span><span><i style="background:var(--c2)"></i>Heizung + Warmwasser</span>${fc ? '<span><i class="dash-line"></i>Prognose</span>' : ''}</div></div>
       <div id="ch-trend" class="chart"></div>
-      ${sts.length < 2 ? '<p class="small muted">Sobald du weitere Jahre importierst, siehst du hier den Verlauf.</p>' : ''}
+      ${fc ? `<p class="small muted">Prognose ${fc.year}: ca. ${eur(fc.total, 0)} – ${esc(fc.method)}. Ersetzt sich automatisch, sobald du die Abrechnung ${fc.year} importierst.</p>` : ''}
     </section>
 
     <section class="card">
@@ -230,28 +261,8 @@ function viewDashboard() {
   </div>`;
 }
 
-// Nebenkosten eines Jahres: Abrechnung, sonst (nach der letzten Abrechnung) laufende Vorauszahlung × 12.
-function nebenkostenForYear(y) {
-  const st = store.statement(y);
-  if (st) return { value: st.totals.costs, kind: 'abrechnung' };
-  const sts = store.statements();
-  const last = sts[sts.length - 1];
-  if (!last || y < last.year || y > new Date().getFullYear()) return null;
-  const sched = last.prepaymentSchedule;
-  const monthly = sched.length ? sched[sched.length - 1].monthly : (last.totals.prepayments || 0) / 12;
-  return monthly ? { value: monthly * 12, monthly, kind: 'vorauszahlung' } : null;
-}
-
-function consumptionSeries(uptoYear) {
-  const map = new Map();
-  for (const s of store.statements()) {
-    for (const h of s.consumptionHistory || []) if (!map.has(h.year)) map.set(h.year, { year: h.year, ...h });
-  }
-  for (const s of store.statements()) {
-    map.set(s.year, { year: s.year, heatingKwh: s.consumption.heatingKwh ?? null, hotWaterKwh: s.consumption.hotWaterKwh ?? null, waterTotalM3: s.consumption.waterTotalM3 ?? null });
-  }
-  return [...map.values()].filter((r) => r.year <= uptoYear).sort((a, b) => a.year - b.year);
-}
+const nebenkostenForYear = (y) => nkForYear(store.statements(), y);
+const consumptionSeries = (upto) => consSeries(store.statements(), upto);
 
 function insightHtml(i) {
   return `<div class="insight ${i.level}">${icon(statusIcon[i.level])}<div><b>${esc(i.title)}</b><p>${esc(i.text)}</p></div></div>`;
@@ -297,11 +308,19 @@ function viewStatement(yearStr) {
   const st = store.statement(year);
   if (!st) return `<p class="pad">Keine Abrechnung für ${year}. <a href="#/abrechnungen">Zurück</a></p>`;
   const prev = store.statement(year - 1);
+  const objDeadline = st.receivedOn ? (() => { const d = new Date(st.receivedOn + 'T12:00:00'); d.setFullYear(d.getFullYear() + 1); return d; })() : null;
   const pcat = {};
   prev?.positions.forEach((p) => { pcat[p.label] = (pcat[p.label] || 0) + p.amount; });
   const t = tax35a(st);
   const c = st.consumption;
   afterRender.push(() => {
+    $('#ics-st')?.addEventListener('click', () => {
+      downloadIcs(`einwendungsfrist-${year}`, buildIcs({
+        uid: `objection-${year}`, title: `Einwendungsfrist Nebenkosten ${year} endet`, date: objDeadline,
+        description: `Letzter Tag, um Einwände gegen die Nebenkostenabrechnung ${year} beim Vermieter geltend zu machen (§ 556 Abs. 3 BGB).`,
+        alarmsDaysBefore: [30, 7],
+      }));
+    });
     $('#del-st').addEventListener('click', () => {
       if (confirm(`Abrechnung ${year} wirklich löschen?`)) { store.deleteStatement(year); location.hash = '#/abrechnungen'; }
     });
@@ -362,6 +381,7 @@ function viewStatement(yearStr) {
     </ul>
     ${st.notes.length ? `<ul class="notes">${st.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
     ${st.revisions?.length ? `<details><summary>Frühere Versionen (${st.revisions.length})</summary><ul class="kv">${st.revisions.map((r) => `<li><span>${r.importedAt ? new Date(r.importedAt).toLocaleString('de-DE') : '–'} · ${esc(r.source || '')}</span><b>${eur(r.totals?.costs)}</b></li>`).join('')}</ul></details>` : ''}
+    ${objDeadline && objDeadline > new Date() ? `<button class="btn full" id="ics-st">${icon('bell')} Einwendungsfrist in Kalender (${objDeadline.toLocaleDateString('de-DE')})</button>` : ''}
     <button class="btn danger small-btn" id="del-st">Abrechnung löschen</button>
   </section>
   </div>`;
@@ -383,9 +403,33 @@ function viewContracts() {
       barChart($('#ch-ct'), { bars: years.map((y) => ({ label: String(y), value: contractsTotal(cs, y), estimated: contractsHasEstimate(cs, y),
         tip: `<b>${y}</b><br>${eur(contractsTotal(cs, y))}${contractsHasEstimate(cs, y) ? '<br>enthält geschätzte Werte' : ''}` })), unit: '€', color: 'var(--c7)' });
     }
+    if ($('#ch-cdonut')) donut($('#ch-cdonut'), { slices: pie.map((x) => ({ label: x.label, value: x.value, color: x.color })), center: eur(total, 0), sub: String(year) });
+    const drawCat = (cat) => {
+      const items = cs.filter((c) => c.category === cat);
+      const ys = contractsYears(items);
+      barChart($('#ch-cat'), { bars: ys.map((y) => ({ label: String(y), value: contractsTotal(items, y), estimated: contractsHasEstimate(items, y),
+        tip: `<b>${esc(cat)} ${y}</b><br>${eur(contractsTotal(items, y))}${contractsHasEstimate(items, y) ? '<br>enthält geschätzte Werte' : ''}` })), unit: '€', color: contractColor(cat) });
+    };
+    if ($('#cat-tabs')) {
+      drawCat(byCat[0].cat);
+      $('#cat-tabs').addEventListener('click', (e) => {
+        const b = e.target.closest('button'); if (!b) return;
+        $('#cat-tabs').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+        drawCat(b.dataset.k);
+      });
+    }
   });
 
   const byCat = CONTRACT_CATEGORIES.map((cat) => ({ cat, items: cs.filter((c) => c.category === cat) })).filter((x) => x.items.length);
+  // Torte: feste Farben je Kategorie, Kategorien ohne eigene Farbe als „Weitere“
+  const pie = [];
+  for (const cat of Object.keys(CONTRACT_COLORS)) {
+    const v = contractsTotal(cs.filter((c) => c.category === cat), year);
+    if (v > 0) pie.push({ label: cat, value: v, color: CONTRACT_COLORS[cat] });
+  }
+  const rest = byCat.filter((x) => !CONTRACT_COLORS[x.cat]);
+  const restV = contractsTotal(rest.flatMap((x) => x.items), year);
+  if (restV > 0) pie.push({ label: rest.length === 1 ? rest[0].cat : 'Weitere', value: restV, color: 'var(--c-other)', detail: rest.map((x) => x.cat).join(', ') });
 
   return `
   <header class="page-head"><div><h1>Verträge</h1><p class="sub">Laufende Kosten über die Jahre</p></div><a class="btn primary" href="#/vertrag/neu">${icon('plus')} Vertrag</a></header>
@@ -399,8 +443,13 @@ function viewContracts() {
   <div class="grid">
     <section class="card span2"><div class="card-head"><h2>Vertragskosten pro Jahr</h2>${years.some((y) => contractsHasEstimate(cs, y)) ? '<div class="legend"><span><i style="background:var(--c7)"></i>Erfasst</span><span><i class="est"></i>Enthält Schätzung</span></div>' : ''}</div><div id="ch-ct" class="chart"></div>
       ${years.some((y) => contractsHasEstimate(cs, y)) ? '<p class="small muted">Für Jahre ohne Eintrag wird ab Vertragsbeginn mit dem Monatsbetrag des nächstgelegenen erfassten Jahres geschätzt.</p>' : ''}</section>
-    <section class="card"><div class="card-head"><h2>Nach Kategorie ${year}</h2></div>
-      <ul class="kv">${byCat.map((x) => `<li><span>${x.cat}</span><b>${eur(contractsTotal(x.items, year))}</b></li>`).join('')}</ul></section>
+    <section class="card"><div class="card-head"><h2>Verteilung ${year}</h2></div>
+      ${total > 0 ? `<div class="donut-wrap"><div id="ch-cdonut"></div>
+        <ul class="donut-legend">${pie.map((x) => `<li><span class="dot" style="background:${x.color}"></span><span>${esc(x.label)}${x.detail && x.label === 'Weitere' ? `<span class="small muted"> (${esc(x.detail)})</span>` : ''}</span><b>${eur(x.value, 0)} · ${Math.round((x.value / total) * 100)} %</b></li>`).join('')}</ul></div>`
+        : '<p class="muted">Für dieses Jahr sind keine Kosten erfasst.</p>'}</section>
+    ${byCat.length ? `<section class="card span3"><div class="card-head"><h2>Kategorien im Vergleich</h2></div>
+      <div class="seg scroll" id="cat-tabs">${byCat.map((x, i) => `<button class="${i ? '' : 'on'}" data-k="${esc(x.cat)}">${esc(x.cat)}</button>`).join('')}</div>
+      <div id="ch-cat" class="chart"></div></section>` : ''}
   </div>
   ${byCat.map((x) => `<section class="card"><div class="card-head"><h2>${x.cat}</h2></div><ul class="list big">${x.items.map((c) => {
     const y = contractYear(c, year) || contractTimeline(c).pop();
@@ -421,18 +470,44 @@ function viewContract(id) {
   const totalOver = c.years.reduce((s, y) => s + (y.benchmark != null ? y.cost - y.benchmark : 0), 0);
   const tl = contractTimeline(c);
   const hasEst = tl.some((y) => y.estimated);
+  const taken = c.years.filter((y) => y.fromEstimate);
+  const hasBench = c.years.some((y) => y.benchmark != null);
   afterRender.push(() => {
     if (tl.length) {
       barChart($('#ch-c'), { bars: tl.map((y) => {
         const r = rateContractYear(y);
         return { label: String(y.year), value: y.cost, marker: y.benchmark, estimated: y.estimated,
-          tip: `<b>${y.year}</b>${y.estimated ? ' (geschätzt)' : ''}<br>${y.estimated ? 'Geschätzt' : 'Bezahlt'}: ${eur(y.cost)}${y.benchmark != null ? `<br>Günstigstes Angebot: ${eur(y.benchmark)}<br>${r.label} (${pct(r.p)})` : ''}` };
+          tip: `<b>${y.year}</b>${y.estimated ? ' (geschätzt)' : y.fromEstimate ? ' (aus Schätzung)' : ''}<br>${y.estimated ? 'Geschätzt' : 'Bezahlt'}: ${eur(y.cost)}${y.benchmark != null ? `<br>Günstigstes Angebot: ${eur(y.benchmark)}<br>${r.label} (${pct(r.p)})` : ''}` };
       }), unit: '€', color: 'var(--c7)' });
     }
+    const undo = (silent) => {
+      const cur = store.contract(id);
+      const removed = cur.years.filter((y) => y.fromEstimate).length;
+      store.replaceContract({ ...cur, years: cur.years.filter((y) => !y.fromEstimate) });
+      if (!silent) toast(`${removed} übernommene Jahr(e) entfernt`);
+      render();
+    };
     $('#take-est')?.addEventListener('click', () => {
-      const est = tl.filter((y) => y.estimated).map(({ estimated, months, note, ...y }) => ({ ...y, note: 'aus Schätzung übernommen' }));
+      const est = tl.filter((y) => y.estimated).map(({ estimated, months, ...y }) => ({ ...y, note: '', fromEstimate: true }));
       store.replaceContract({ ...c, years: [...c.years, ...est].sort((a, b) => a.year - b.year) });
-      toast(`${est.length} Jahr(e) übernommen`); render();
+      render();
+      toast(`${est.length} Jahr(e) übernommen`, 8000, { label: 'Rückgängig', run: () => undo(true) });
+    });
+    $('#undo-est')?.addEventListener('click', () => {
+      if (confirm(`${taken.length} aus der Schätzung übernommene(s) Jahr(e) wieder entfernen? Sie werden danach wieder automatisch geschätzt.`)) undo(false);
+    });
+    $('#ics-c')?.addEventListener('click', () => {
+      downloadIcs(`kuendigung-${c.name}`, buildIcs({
+        uid: `notice-${c.id}-${n.lastNotice.toISOString().slice(0, 10)}`,
+        title: `Kündigen: ${c.name}${c.provider ? ' (' + c.provider + ')' : ''}`,
+        date: n.lastNotice,
+        description: `Letzter Tag für die Kündigung (Frist ${c.noticePeriodMonths ?? 0} Monat(e)). Laufzeitende: ${n.end.toLocaleDateString('de-DE')}.${c.contractNo ? ' Vertragsnr.: ' + c.contractNo : ''}`,
+        alarmsDaysBefore: [30, 7, 1],
+      }));
+    });
+    $('#hist-more')?.addEventListener('click', (e) => {
+      const t = $('table.hist'); t.classList.toggle('show-all');
+      e.target.textContent = t.classList.contains('show-all') ? 'Weniger anzeigen' : `Ältere Jahre anzeigen (${tl.length - 5})`;
     });
     $('#del-c').addEventListener('click', () => {
       if (confirm(`Vertrag „${c.name}“ löschen?`)) { store.deleteContract(id); location.hash = '#/vertraege'; }
@@ -442,49 +517,76 @@ function viewContract(id) {
   <header class="page-head"><div><a class="back" href="#/vertraege">${icon('back')} Verträge</a><h1>${esc(c.name)}</h1><p class="sub">${esc(c.category)}${c.provider ? ' · ' + esc(c.provider) : ''}</p></div>
     <a class="btn" href="#/vertrag/${c.id}/bearbeiten">Bearbeiten</a></header>
   <div class="grid">
-    <section class="card span2"><div class="card-head"><h2>Kosten pro Jahr</h2>${c.years.some((y) => y.benchmark != null) || hasEst ? `<div class="legend"><span><i style="background:var(--c7)"></i>Bezahlt</span>${hasEst ? '<span><i class="est"></i>Geschätzt</span>' : ''}${c.years.some((y) => y.benchmark != null) ? '<span><i class="dash"></i>Günstigstes Angebot</span>' : ''}</div>` : ''}</div>
+    <section class="card span2"><div class="card-head"><h2>Kosten pro Jahr</h2>${hasBench || hasEst ? `<div class="legend"><span><i style="background:var(--c7)"></i>Bezahlt</span>${hasEst ? '<span><i class="est"></i>Geschätzt</span>' : ''}${hasBench ? '<span><i class="dash"></i>Günstigstes Angebot</span>' : ''}</div>` : ''}</div>
       ${tl.length ? '<div id="ch-c" class="chart"></div>' : '<p class="muted">Noch keine Jahreswerte. Unter „Bearbeiten“ hinzufügen.</p>'}</section>
     <section class="card"><div class="card-head"><h2>Bewertung</h2></div>
-      ${c.years.some((y) => y.benchmark != null)
+      ${hasBench
         ? `<p>${totalOver > 0 ? `Über alle Jahre hast du <b class="bad">${eur(totalOver)}</b> mehr bezahlt als beim jeweils günstigsten Angebot.` : `Über alle Jahre lagst du <b class="good">${eur(-totalOver)}</b> unter dem Vergleichsangebot. Gut gewählt!`}</p>`
         : '<p class="muted">Trage pro Jahr ein Vergleichsangebot ein (z. B. von Check24/Verivox), um deine Wahl zu bewerten.</p>'}
       <ul class="kv">
         ${c.contractNo ? `<li><span>Vertragsnummer</span><b>${esc(c.contractNo)}</b></li>` : ''}
         ${c.startDate ? `<li><span>Beginn</span><b>${dateDe(c.startDate)}</b></li>` : ''}
         ${c.endDate ? `<li><span>Laufzeitende</span><b>${dateDe(c.endDate)}</b></li>` : ''}
-        ${c.noticePeriodMonths != null ? `<li><span>Kündigungsfrist</span><b>${c.noticePeriodMonths} Monat(e)</b></li>` : ''}
+        ${c.noticePeriodMonths != null ? `<li><span>Kündigungsfrist</span><b>${c.noticePeriodMonths} ${c.noticePeriodMonths === 1 ? 'Monat' : 'Monate'}</b></li>` : ''}
         ${n ? `<li><span>Nächste Kündigung bis</span><b>${n.lastNotice.toLocaleDateString('de-DE')}</b></li>` : ''}
         <li><span>Status</span><b>${c.active ? 'aktiv' : 'beendet'}</b></li>
       </ul>
+      ${n ? `<button class="btn full" id="ics-c">${icon('bell')} Erinnerung in Kalender</button>
+        <p class="small muted">Legt einen Termin am letzten Kündigungstag an – mit Erinnerung 30, 7 und 1 Tag vorher.</p>`
+        : c.active ? '<p class="small muted">Für eine Kündigungs-Erinnerung „Laufzeitende“ und „Kündigungsfrist“ unter „Bearbeiten“ eintragen.</p>' : ''}
       ${c.notes ? `<p class="small">${esc(c.notes)}</p>` : ''}
     </section>
-    <section class="card span3"><div class="card-head"><h2>Verlauf</h2>${hasEst ? '<button class="btn small-btn" id="take-est" style="margin:0">Schätzungen als erfasst übernehmen</button>' : ''}</div>
-      ${hasEst ? '<p class="small muted">Jahre ohne Eintrag werden ab Vertragsbeginn geschätzt. Übernimm sie oder trage die echten Beträge unter „Bearbeiten“ ein.</p>' : ''}
-      <table class="tbl"><thead><tr><th>Jahr</th><th class="hide-s">Anbieter / Tarif</th><th class="r">Kosten</th><th class="r">Δ Vorjahr</th><th class="r">Vergleich</th></tr></thead>
-      <tbody>${tl.slice().reverse().map((y) => {
+    <section class="card span3"><div class="card-head"><h2>Verlauf</h2></div>
+      ${hasEst || taken.length ? `<div class="note-box">
+        ${hasEst ? '<p class="small muted">Jahre ohne Eintrag werden ab Vertragsbeginn geschätzt. Übernimm sie oder trage die echten Beträge unter „Bearbeiten“ ein.</p>' : ''}
+        <div class="btn-row">
+          ${hasEst ? `<button class="btn" id="take-est">${icon('check')} Schätzungen übernehmen</button>` : ''}
+          ${taken.length ? `<button class="btn" id="undo-est">${icon('undo')} Übernahme rückgängig (${taken.length})</button>` : ''}
+        </div></div>` : ''}
+      <table class="tbl hist"><thead><tr><th>Jahr</th><th class="r">Kosten</th><th class="r${hasBench ? ' hide-s' : ''}">Δ Vorjahr</th>${hasBench ? '<th class="r">Vergleich</th>' : ''}</tr></thead>
+      <tbody>${tl.slice().reverse().map((y, idx) => {
         const py = contractYear(c, y.year - 1), r = rateContractYear(y);
-        return `<tr class="${y.estimated ? 'est-row' : ''}"><td><b>${y.year}</b>${y.estimated ? ' <span class="pill muted">geschätzt</span>' : ''}${y.note ? `<div class="small muted">${esc(y.note)}</div>` : ''}</td><td class="hide-s">${esc(y.provider || c.provider)}${y.tariff ? '<div class="small muted">' + esc(y.tariff) + '</div>' : ''}</td>
-          <td class="r">${eur(y.cost)}<div class="small muted">${eur(y.cost / (y.months || 12))}/Monat</div></td><td class="r">${py ? delta(((y.cost - py.cost) / py.cost) * 100) : '–'}</td>
-          <td class="r">${r ? `<span class="badge ${r.level}">${icon(statusIcon[r.level])}${r.label}</span><div class="small muted">${eur(y.benchmark)}${y.benchmarkNote ? ' · ' + esc(y.benchmarkNote) : ''}</div>` : '–'}</td></tr>`;
+        const full = (q) => q && (q.months == null || q.months >= 12) && monthsActive(c, q.year) >= 12;
+        const tag = y.estimated ? '<span class="pill muted">geschätzt</span>' : y.fromEstimate ? '<span class="pill muted">übernommen</span>' : '';
+        const sub = [y.provider && y.provider !== c.provider ? esc(y.provider) : '', y.tariff ? esc(y.tariff) : '', y.note ? esc(y.note) : '', y.months && y.months < 12 ? y.months + ' Monate' : ''].filter(Boolean).join(' · ');
+        return `<tr class="${y.estimated ? 'est-row' : ''}${idx >= 5 ? ' more-row' : ''}"><td><b>${y.year}</b>${tag ? '<div>' + tag + '</div>' : ''}${sub ? `<div class="small muted">${sub}</div>` : ''}</td>
+          <td class="r">${eur(y.cost)}<div class="small muted">${eur(y.cost / (y.months || 12))} mtl.</div></td><td class="r${hasBench ? ' hide-s' : ''}">${py && full(py) && full(y) ? delta(((y.cost - py.cost) / py.cost) * 100) : '–'}</td>
+          ${hasBench ? `<td class="r wrap">${r ? `<span class="badge ${r.level}">${icon(statusIcon[r.level])}${r.label}</span><div class="small muted">${eur(y.benchmark)}${y.benchmarkNote ? '<br>' + esc(y.benchmarkNote) : ''}</div>` : '–'}</td>` : ''}</tr>`;
       }).join('')}</tbody></table>
+      ${tl.length > 5 ? `<button class="btn full" id="hist-more">Ältere Jahre anzeigen (${tl.length - 5})</button>` : ''}
       <button class="btn danger small-btn" id="del-c">Vertrag löschen</button>
     </section>
   </div>`;
 }
 
+function downloadIcs(name, ics) {
+  const file = name.toLowerCase().replace(/[^a-z0-9äöüß]+/g, '-') + '.ics';
+  // iOS: Safari lädt die .ics-Datei; Antippen öffnet „Zum Kalender hinzufügen“.
+  const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = file;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  toast('Kalendertermin erstellt – Datei öffnen und „Hinzufügen“ antippen', 5000);
+}
+
 function viewContractEdit(id) {
   const c = id ? store.contract(id) : { id: uid(), name: '', category: 'Versicherung', provider: '', contractNo: '', startDate: '', endDate: '', noticePeriodMonths: null, autoRenewMonths: 12, active: true, notes: '', years: [] };
   if (!c) return '<p class="pad">Vertrag nicht gefunden.</p>';
+  const de = (n) => (n != null && n !== '' ? (Math.round(n * 100) / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false }) : '');
   const yearRow = (y) => `<div class="yrow">
-      <label>Jahr<input name="year" type="number" inputmode="numeric" value="${y.year ?? new Date().getFullYear()}"></label>
-      <label>Kosten / Jahr €<input name="cost" type="text" inputmode="decimal" value="${y.cost != null ? String(y.cost).replace('.', ',') : ''}" placeholder="z. B. 239,88"></label>
-      <label>oder / Monat €<input name="monthly" type="text" inputmode="decimal" placeholder="19,99"></label>
+      <input type="hidden" name="fromEstimate" value="${y.fromEstimate ? 'true' : ''}">
+      <label class="span-all">Jahr<input name="year" type="number" inputmode="numeric" value="${y.year ?? new Date().getFullYear()}"></label>
+      <label>Kosten / Monat €<input name="monthly" type="text" inputmode="decimal" value="${de(y.cost != null ? y.cost / 12 : null)}" placeholder="19,99"></label>
+      <label>Kosten / Jahr €<input name="cost" type="text" inputmode="decimal" value="${de(y.cost)}" placeholder="239,88"></label>
+      <label>Günstigstes Angebot / Monat €<input name="benchMonthly" type="text" inputmode="decimal" value="${de(y.benchmark != null ? y.benchmark / 12 : null)}" placeholder="14,99"></label>
+      <label>Günstigstes Angebot / Jahr €<input name="benchmark" type="text" inputmode="decimal" value="${de(y.benchmark)}" placeholder="179,88"></label>
       <label>Tarif<input name="tariff" value="${esc(y.tariff || '')}"></label>
       <label>Anbieter (falls gewechselt)<input name="provider" value="${esc(y.provider || '')}"></label>
-      <label>Günstigstes Angebot / Jahr €<input name="benchmark" type="text" inputmode="decimal" value="${y.benchmark != null ? String(y.benchmark).replace('.', ',') : ''}"></label>
-      <label>Quelle Vergleich<input name="benchmarkNote" value="${esc(y.benchmarkNote || '')}" placeholder="z. B. Check24 03/2025"></label>
+      <label class="span-all">Quelle Vergleich<input name="benchmarkNote" value="${esc(y.benchmarkNote || '')}" placeholder="z. B. Check24 03/2025"></label>
       <button type="button" class="btn danger small-btn rm">${icon('x')} Jahr entfernen</button>
     </div>`;
+  const parseDe = (v) => { const t = String(v).trim().replace(/\s|€/g, ''); if (!t) return null; const n = Number(t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t); return Number.isFinite(n) ? n : null; };
   afterRender.push(() => {
     const f = $('#cform');
     $('#add-year').addEventListener('click', () => {
@@ -495,13 +597,23 @@ function viewContractEdit(id) {
       $('#years').insertAdjacentHTML('beforeend', yearRow({ year: next, tariff: last?.querySelector('[name=tariff]').value }));
     });
     f.addEventListener('click', (e) => { if (e.target.closest('.rm')) e.target.closest('.yrow').remove(); });
+    // Monat ⇄ Jahr automatisch umrechnen
+    const pairs = { monthly: ['cost', 12], cost: ['monthly', 1 / 12], benchMonthly: ['benchmark', 12], benchmark: ['benchMonthly', 1 / 12] };
+    f.addEventListener('input', (e) => {
+      const row = e.target.closest('.yrow'); if (!row) return;
+      row.querySelector('[name=fromEstimate]').value = '';
+      const pr = pairs[e.target.name]; if (!pr) return;
+      const v = parseDe(e.target.value);
+      row.querySelector(`[name=${pr[0]}]`).value = v == null ? '' : de(v * pr[1]);
+    });
     f.addEventListener('submit', (e) => {
       e.preventDefault();
       const fd = new FormData(f);
       const years = [...f.querySelectorAll('.yrow')].map((row) => {
         const v = (n) => row.querySelector(`[name=${n}]`).value.trim();
-        return { year: v('year'), cost: v('cost') || null, monthly: v('monthly') || null, tariff: v('tariff'), provider: v('provider'), benchmark: v('benchmark') || null, benchmarkNote: v('benchmarkNote') };
-      }).map((y) => (y.cost ? { ...y, monthly: null } : y));
+        return { year: v('year'), cost: v('cost') || null, monthly: v('monthly') || null, tariff: v('tariff'), provider: v('provider'),
+          benchmark: v('benchmark') || null, benchmarkMonthly: v('benchMonthly') || null, benchmarkNote: v('benchmarkNote'), fromEstimate: v('fromEstimate') === 'true' };
+      }).map((y) => (y.cost ? { ...y, monthly: null } : y)).map((y) => (y.benchmark ? { ...y, benchmarkMonthly: null } : y));
       try {
         const nc = normalizeContract({
           id: c.id, name: fd.get('name'), category: fd.get('category'), provider: fd.get('provider'), contractNo: fd.get('contractNo'),
@@ -530,7 +642,7 @@ function viewContractEdit(id) {
       <label class="check"><input type="checkbox" name="active" ${c.active ? 'checked' : ''}> Vertrag läuft noch</label>
     </div>
     <h2>Kosten pro Jahr</h2>
-    <p class="small muted">Entweder Jahreskosten oder Monatsbetrag (wird ×12 gerechnet). Jahre ohne Eintrag schätzt die App ab „Beginn“ automatisch. „Günstigstes Angebot“ = was du im selben Jahr woanders bezahlt hättest.</p>
+    <p class="small muted">Monats- oder Jahresbetrag eingeben – der andere Wert wird automatisch umgerechnet. Jahre ohne Eintrag schätzt die App ab „Beginn“ automatisch. „Günstigstes Angebot“ = was du im selben Jahr woanders bezahlt hättest.</p>
     <div id="years">${(c.years.length ? c.years : [{}]).map(yearRow).join('')}</div>
     <button type="button" class="btn" id="add-year">${icon('plus')} Jahr hinzufügen</button>
     <div class="btn-row end"><a class="btn" href="${id ? '#/vertrag/' + id : '#/vertraege'}">Abbrechen</a><button class="btn primary">Speichern</button></div>
@@ -538,6 +650,7 @@ function viewContractEdit(id) {
 }
 
 // ---------- Statistik ----------
+let statsShowAllYears = false;
 function viewStats() {
   const sts = store.statements();
   if (!sts.length) return emptyState();
@@ -545,11 +658,18 @@ function viewStats() {
   const catSum = (s, k) => s.positions.filter((p) => p.category === k).reduce((a, p) => a + p.amount, 0);
   const cs = store.contracts();
   const ys = [...sts.map((s) => s.year), ...contractsYears(cs), ...(sts.length ? [new Date().getFullYear()] : [])];
+  // Kategorien-Tabelle: standardmäßig die letzten 2 Jahre (+ Δ), damit sie aufs iPhone passt
+  const tsts = statsShowAllYears ? sts : sts.slice(-2);
   const fixYears = ys.length ? Array.from({ length: Math.max(...ys) - Math.min(...ys) + 1 }, (_, i) => Math.min(...ys) + i) : [];
   afterRender.push(() => {
     lineChart($('#ch-s1'), { labels: sts.map((s) => String(s.year)), unit: '€/m²', series: [
       { name: 'Kosten pro m²', color: 'var(--c3)', values: sts.map((s) => (s.unit.livingArea ? s.totals.costs / s.unit.livingArea : null)) },
     ] });
+    $('#all-years')?.addEventListener('click', () => { statsShowAllYears = !statsShowAllYears; render(); });
+    $('#fix-more')?.addEventListener('click', (e) => {
+      const t = $('table.fix'); t.classList.toggle('show-all');
+      e.target.textContent = t.classList.contains('show-all') ? 'Weniger anzeigen' : `Ältere Jahre anzeigen (${fixYears.length - 3})`;
+    });
     barChart($('#ch-s2'), { bars: sts.map((s) => ({ label: String(s.year), value: s.totals.balance ?? 0, color: (s.totals.balance ?? 0) < 0 ? 'var(--critical)' : 'var(--good)',
       tip: `<b>${s.year}</b><br>${(s.totals.balance ?? 0) < 0 ? 'Nachzahlung' : 'Guthaben'} ${eur(Math.abs(s.totals.balance ?? 0))}` })).map((b) => ({ ...b, value: Math.abs(b.value) })), unit: '€' });
   });
@@ -559,26 +679,27 @@ function viewStats() {
     <section class="card span2"><div class="card-head"><h2>Kosten pro m²</h2></div><div id="ch-s1" class="chart"></div></section>
     <section class="card"><div class="card-head"><h2>Nachzahlung / Guthaben</h2></div><div id="ch-s2" class="chart"></div>
       <p class="small muted"><span class="dot" style="background:var(--critical)"></span>Nachzahlung <span class="dot" style="background:var(--good)"></span>Guthaben</p></section>
-    <section class="card span3"><div class="card-head"><h2>Kategorien je Jahr</h2></div>
-      <div class="scroll-x"><table class="tbl">
-        <thead><tr><th>Kategorie</th>${sts.map((s) => `<th class="r">${s.year}</th>`).join('')}${sts.length > 1 ? '<th class="r">Δ</th>' : ''}</tr></thead>
+    <section class="card span3"><div class="card-head"><h2>Kategorien je Jahr</h2>${sts.length > 2 ? `<button class="link-btn" id="all-years">${statsShowAllYears ? 'Nur letzte 2 Jahre' : `Alle ${sts.length} Jahre`}</button>` : ''}</div>
+      <div class="scroll-x"><table class="tbl cats">
+        <thead><tr><th>Kategorie</th>${tsts.map((s) => `<th class="r">${s.year}</th>`).join('')}${tsts.length > 1 ? '<th class="r">Δ</th>' : ''}</tr></thead>
         <tbody>${cats.map((k) => {
-          const vals = sts.map((s) => catSum(s, k));
+          const vals = tsts.map((s) => catSum(s, k));
           const a = vals[vals.length - 2], b = vals[vals.length - 1];
-          return `<tr><td>${CATEGORIES[k].label}</td>${vals.map((v) => `<td class="r">${v ? eur(v) : '–'}</td>`).join('')}${sts.length > 1 ? `<td class="r">${a ? delta(((b - a) / a) * 100) : '–'}</td>` : ''}</tr>`;
+          return `<tr><td>${CATEGORIES[k].label}</td>${vals.map((v) => `<td class="r">${v ? eur(v) : '–'}</td>`).join('')}${tsts.length > 1 ? `<td class="r">${a ? delta(((b - a) / a) * 100) : '–'}</td>` : ''}</tr>`;
         }).join('')}</tbody>
-        <tfoot><tr><td>Gesamt</td>${sts.map((s) => `<td class="r">${eur(s.totals.costs)}</td>`).join('')}${sts.length > 1 ? `<td class="r">${delta(((sts[sts.length - 1].totals.costs - sts[sts.length - 2].totals.costs) / sts[sts.length - 2].totals.costs) * 100)}</td>` : ''}</tr>
-        <tr><td>Vorauszahlungen</td>${sts.map((s) => `<td class="r">${eur(s.totals.prepayments)}</td>`).join('')}${sts.length > 1 ? '<td></td>' : ''}</tr></tfoot>
+        <tfoot><tr><td>Gesamt</td>${tsts.map((s) => `<td class="r">${eur(s.totals.costs)}</td>`).join('')}${tsts.length > 1 ? `<td class="r">${delta(((tsts[tsts.length - 1].totals.costs - tsts[tsts.length - 2].totals.costs) / tsts[tsts.length - 2].totals.costs) * 100)}</td>` : ''}</tr>
+        <tr><td>Vorauszahlungen</td>${tsts.map((s) => `<td class="r">${eur(s.totals.prepayments)}</td>`).join('')}${tsts.length > 1 ? '<td></td>' : ''}</tr></tfoot>
       </table></div></section>
     ${cs.length ? `<section class="card span3"><div class="card-head"><h2>Gesamte Fixkosten</h2><span class="small muted">Nebenkosten + Verträge</span></div>
       <table class="tbl fix"><thead><tr><th>Jahr</th><th class="r">Nebenkosten</th><th class="r">Verträge</th><th class="r">Summe</th></tr></thead><tbody>
-      ${fixYears.slice().reverse().map((y) => {
+      ${fixYears.slice().reverse().map((y, idx) => {
         const nk = nebenkostenForYear(y), ct = contractsTotal(cs, y), est = contractsHasEstimate(cs, y);
-        return `<tr><td><b>${y}</b></td>
+        return `<tr class="${idx >= 3 ? 'more-row' : ''}"><td><b>${y}</b></td>
           <td class="r">${nk ? eur(nk.value) + (nk.kind === 'vorauszahlung' ? '¹' : '') : '–'}<div class="small muted">${nk ? (nk.kind === 'abrechnung' ? 'Abrechnung' : eur(nk.monthly, 0) + ' mtl.') : 'keine Abrechnung'}</div></td>
           <td class="r">${eur(ct)}${est ? '*' : ''}<div class="small muted">${eur(ct / 12, 0)} mtl.</div></td>
           <td class="r"><b>${eur((nk?.value || 0) + ct)}</b><div class="small muted">${eur(((nk?.value || 0) + ct) / 12, 0)} mtl.</div></td></tr>`;
       }).join('')}</tbody></table>
+      ${fixYears.length > 3 ? `<button class="btn full" id="fix-more">Ältere Jahre anzeigen (${fixYears.length - 3})</button>` : ''}
       <p class="small muted">${fixYears.some((y) => nebenkostenForYear(y)?.kind === 'vorauszahlung') ? '¹ noch keine Abrechnung – laufende Vorauszahlung laut letzter Abrechnung × 12.<br>' : ''}${fixYears.some((y) => contractsHasEstimate(cs, y)) ? '* enthält geschätzte Vertragskosten (ab Vertragsbeginn).<br>' : ''}${fixYears.some((y) => !nebenkostenForYear(y)) ? '„keine Abrechnung“: Für diese Jahre liegt keine Nebenkostenabrechnung vor – einfach über „Import“ nachtragen.' : ''}</p></section>` : ''}
   </div>`;
 }
@@ -676,6 +797,11 @@ function viewMore() {
       const m = t.match(/<!-- PROMPT START -->([\s\S]*?)<!-- PROMPT END -->/);
       $('#prompt').textContent = (m ? m[1] : t).trim();
     }).catch(() => { $('#prompt').textContent = 'Anleitung konnte nicht geladen werden (offline?).'; });
+    $('#theme-seg').addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      setTheme(b.dataset.k);
+      $('#theme-seg').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+    });
     $('#upd').addEventListener('click', async () => {
       const reg = await navigator.serviceWorker?.getRegistration();
       if (reg) { await reg.update(); toast('Nach Updates gesucht'); } else location.reload();
@@ -701,8 +827,16 @@ function viewMore() {
       <div class="btn-row"><button class="btn primary" id="exp">Sicherung exportieren</button><a class="btn" href="#/import">Sicherung importieren</a></div>
       <button class="btn danger small-btn" id="reset">Alle Daten löschen</button>
     </section>
+    <section class="card"><h2>${icon('sun')} Darstellung</h2>
+      <div class="seg full-seg" id="theme-seg">${[['auto', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel']].map(([k, l]) => `<button data-k="${k}" class="${getTheme() === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+      <p class="small muted">„Automatisch“ folgt der Einstellung deines iPhones.</p>
+    </section>
     <section class="card"><h2>Auf dem iPhone installieren</h2>
-      <ol class="small"><li>Diese Seite in <b>Safari</b> öffnen</li><li>Teilen-Symbol <b>⎋</b> antippen</li><li><b>„Zum Home-Bildschirm“</b> wählen</li></ol>
+      <ol class="small steps-ios">
+        <li>Diese Seite in <b>Safari</b> öffnen</li>
+        <li>Auf <span class="ios-ic">${icon('share')}</span> <b>Teilen</b> tippen – ab iOS 26 zuerst unten rechts auf <span class="ios-ic dots">•••</span></li>
+        <li><b>„Zum Home-Bildschirm“</b> wählen (ggf. nach unten scrollen)</li>
+      </ol>
       <p class="small muted">Danach startet die App im Vollbild und funktioniert offline.</p>
       <button class="btn" id="upd">Nach Update suchen</button>
     </section>
@@ -723,6 +857,7 @@ document.addEventListener('click', (e) => {
 
 // ---------- Start ----------
 installTooltip();
+applyTheme();
 render();
 
 // Was-ist-neu-Hinweis nach Update

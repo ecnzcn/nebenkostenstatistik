@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.3.0 – 2026-10-07
+Prognose im Kostenverlauf, Kalender-Erinnerungen (Kündigung, Einwendungsfrist), Verträge mit Torte und Kategorienvergleich, Rückgängig für übernommene Schätzungen, Monatsbeträge im Formular, Theme-Schalter, Layout-Fixes, Vorbereitung native iOS-App (Schema, Golden-Tests, Swift-Modelle).
+
 ## 1.2.0 – 2026-10-07
 Neues App-Icon, Fixkosten-Übersicht als Jahresliste, laufende Vorauszahlung für Jahre ohne Abrechnung.
 

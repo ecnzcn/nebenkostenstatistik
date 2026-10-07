@@ -1,0 +1,13 @@
+{
+  "format": "nebenkostencheck",
+  "formatVersion": 1,
+  "statements": [],
+  "contracts": [
+    { "id": "netflix", "name": "Netflix", "category": "Streaming", "provider": "Netflix", "startDate": "2023-02-07",
+      "noticePeriodMonths": 1, "autoRenewMonths": 1, "years": [ { "year": 2026, "cost": 59.88, "benchmarkMonthly": 5.99 } ] },
+    { "id": "adac", "name": "ADAC", "category": "Auto", "provider": "ADAC", "startDate": "2014-10-07", "endDate": "2026-10-07",
+      "noticePeriodMonths": 1, "autoRenewMonths": 12, "years": [ { "year": 2024, "cost": 139 }, { "year": 2026, "cost": 149 } ] },
+    { "id": "alt", "name": "Alter Handyvertrag", "category": "Handy", "startDate": "2019-05-01", "endDate": "2022-04-30", "active": false,
+      "years": [ { "year": 2020, "cost": 479.4, "benchmark": 240 } ] }
+  ]
+}

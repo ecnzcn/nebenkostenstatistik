@@ -1,0 +1,9 @@
+{
+  "name": "nebenkostencheck",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/run.mjs",
+    "test:update": "node tests/run.mjs --update"
+  }
+}

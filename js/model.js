@@ -35,6 +35,13 @@ export const CONTRACT_CATEGORIES = [
   'Fitness', 'Auto', 'Bank', 'Software', 'Sonstiges',
 ];
 
+// Feste Farbe je Vertragskategorie (max. 7 Farben + Grau für „Weitere“, Farbe folgt der Kategorie).
+export const CONTRACT_COLORS = {
+  Versicherung: 'var(--c1)', Handy: 'var(--c2)', Internet: 'var(--c3)', Strom: 'var(--c4)',
+  Streaming: 'var(--c5)', Auto: 'var(--c6)', Fitness: 'var(--c7)',
+};
+export const contractColor = (cat) => CONTRACT_COLORS[cat] || 'var(--c-other)';
+
 const round2 = (n) => Math.round(n * 100) / 100;
 const num = (v) => {
   if (v === null || v === undefined || v === '') return null;
@@ -179,9 +186,10 @@ export function normalizeContract(raw, idx = 0) {
         cost: num(y.cost) ?? (num(y.monthly) !== null ? round2(num(y.monthly) * 12) : null),
         tariff: y.tariff ? String(y.tariff) : '',
         provider: y.provider ? String(y.provider) : '',
-        benchmark: num(y.benchmark),
+        benchmark: num(y.benchmark) ?? (num(y.benchmarkMonthly) !== null ? round2(num(y.benchmarkMonthly) * 12) : null),
         benchmarkNote: y.benchmarkNote ? String(y.benchmarkNote) : '',
         note: y.note ? String(y.note) : '',
+        fromEstimate: y.fromEstimate === true || y.fromEstimate === 'true',
       }))
       .filter((y) => Number.isInteger(y.year) && y.cost !== null)
       .sort((a, b) => a.year - b.year),

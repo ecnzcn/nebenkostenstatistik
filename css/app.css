@@ -373,3 +373,14 @@ a.insight.reminder { color: var(--text); text-decoration: none; }
 }
 table.hist tr.more-row { display: none; }
 table.hist.show-all tr.more-row { display: table-row; }
+
+/* ---------- v1.4 Dokumente ---------- */
+.list.docs li { border-bottom: 1px solid var(--border); }
+.list.docs li:last-child { border: 0; }
+.doc-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; min-height: 52px; }
+.doc-row > .ic { color: var(--primary); flex: none; }
+.doc-open { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; background: none; border: 0; padding: 4px 0; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+.doc-open b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.icon-btn { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border: 0; border-radius: 10px; background: transparent; color: var(--muted); cursor: pointer; }
+.icon-btn.danger { color: var(--critical-ink); }
+.icon-btn .ic { width: 19px; height: 19px; }

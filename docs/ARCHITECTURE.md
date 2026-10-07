@@ -17,6 +17,7 @@ dass sich die App später 1:1 als native iOS-App (Swift/SwiftUI) umsetzen lässt
 │                   js/calendar.js  Erinnerungen (.ics)         │
 ├──────────────────────────────────────────────────────────────┤
 │ Speicher          js/store.js     localStorage + Änderungslog │  ← SwiftData / Codable-Datei
+│                   js/files.js     Dokumente in IndexedDB      │  ← Dateien im App-Container
 ├──────────────────────────────────────────────────────────────┤
 │ Datenvertrag      docs/schema/nebenkostencheck.schema.json    │  ← identisch auf allen
 │                   (Claude-Import, Sicherung, iOS-App)         │     Plattformen
@@ -40,6 +41,7 @@ Regeln, damit das so bleibt:
 | `js/analysis.js` | `Analysis.swift` – Funktion für Funktion portieren, gegen `tests/golden.json` testen (XCTest) |
 | `js/store.js` (localStorage) | SwiftData oder JSON-Datei in iCloud Drive (Sync zwischen Geräten gratis) |
 | `js/charts.js` (SVG) | Swift Charts (`BarMark`, `LineMark` mit `.lineStyle(dash:)` für Prognose, `SectorMark` für Torten) |
+| `js/files.js` (IndexedDB) | Dateien im App-Container / iCloud Drive, Vorschau mit QuickLook |
 | `js/calendar.js` (.ics) | `UNUserNotificationCenter` (lokale Mitteilungen) oder EventKit |
 | Import per Text/Datei | Share-Extension / „Öffnen mit“ für `.json`, Kamera-Scan + Claude API |
 | Service Worker (offline) | entfällt – native Apps sind offline |

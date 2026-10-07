@@ -15,6 +15,19 @@ struct ImportFile: Codable {
     var formatVersion: Int          // aktuell 1
     var statements: [Statement] = []
     var contracts: [Contract] = []
+    var files: [Attachment]? = nil  // nur in Sicherungen
+}
+
+/// Dokument zu einem Vertrag (in der Sicherung als Base64).
+/// iOS: Datei im App-Container ablegen, Metadaten in SwiftData; Anzeige per QuickLook.
+struct Attachment: Codable, Identifiable, Hashable {
+    var id: String
+    var contractId: String
+    var name: String
+    var type: String?               // MIME-Typ
+    var size: Int?
+    var addedAt: String?            // ISO 8601
+    var data: Data?                 // Codable dekodiert Base64-Strings automatisch zu Data
 }
 
 // MARK: - Nebenkostenabrechnung

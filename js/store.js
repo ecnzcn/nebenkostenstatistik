@@ -132,6 +132,7 @@ export const store = {
   },
 
   logExport() { log('Daten exportiert', 'Sicherungsdatei erstellt'); persist(); },
+  logActivity(action, detail) { log(action, detail); persist(); },
 
   reset() {
     const settings = state.settings;

@@ -2,10 +2,20 @@
 // Bei jeder Änderung: APP_VERSION erhöhen, Eintrag oben in CHANGELOG ergänzen
 // und CACHE_VERSION in sw.js angleichen (sonst sieht das iPhone die neue Version nicht).
 
-export const APP_VERSION = '1.3.0';
+export const APP_VERSION = '1.4.0';
 export const DATA_FORMAT_VERSION = 1;
 
 export const CHANGELOG = [
+  {
+    version: '1.4.0',
+    date: '2026-10-07',
+    title: 'Dokumente zu Verträgen',
+    changes: [
+      'Verträge: Dateien hochladen (PDF, Fotos, …) – öffnen und löschen direkt in der Vertragsansicht',
+      'Dokumente sind in der Sicherung enthalten und werden beim Wiederherstellen mit eingespielt',
+      'Behoben: Bei „Darstellung“ war die gewählte Option erst nach einem Seitenwechsel markiert',
+    ],
+  },
   {
     version: '1.3.0',
     date: '2026-10-07',

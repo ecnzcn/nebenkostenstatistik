@@ -4,6 +4,7 @@ import { GROUPS, CATEGORIES, CONTRACT_CATEGORIES, CONTRACT_COLORS, contractColor
 import { kpis, analyze, eur, pct, numf, dateDe, tax35a, contractYear, contractTimeline, rateContractYear, contractsYears, contractsTotal, contractsHasEstimate, noticeInfo,
   forecastNext, monthsActive, nebenkostenForYear as nkForYear, consumptionSeries as consSeries } from './analysis.js';
 import { buildIcs } from './calendar.js';
+import { files, fmtSize, MAX_FILE_MB } from './files.js';
 import { lineChart, barChart, donut, sparkline, installTooltip } from './charts.js';
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -32,6 +33,10 @@ const ICONS = {
   undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
   cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
   share: '<path d="M12 3v12M8 7l4-4 4 4"/><path d="M8 11H6a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-2"/>',
+  clip: '<path d="M21 11l-8.6 8.6a5 5 0 0 1-7-7L14 4a3.3 3.3 0 0 1 4.7 4.7l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4L15.6 7"/>',
+  file: '<path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7z"/><path d="M14 3v4h4"/>',
+  image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-5-5-9 8"/>',
+  trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
 };
 const icon = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]}</svg>`;
@@ -505,12 +510,51 @@ function viewContract(id) {
         alarmsDaysBefore: [30, 7, 1],
       }));
     });
+    const loadDocs = async () => {
+      const list = $('#doc-list'); if (!list) return;
+      try {
+        const docs = await files.list(id);
+        $('#doc-count').textContent = docs.length ? `${docs.length} ${docs.length === 1 ? 'Datei' : 'Dateien'}` : '';
+        list.innerHTML = docs.length ? docs.map((d) => `<li><div class="doc-row">${icon(d.type.startsWith('image/') ? 'image' : 'file')}
+          <button class="doc-open grow" data-id="${d.id}"><b>${esc(d.name)}</b><span class="small muted">${fmtSize(d.size)} · ${new Date(d.addedAt).toLocaleDateString('de-DE')}</span></button>
+          <button class="icon-btn danger" data-del="${d.id}" aria-label="Löschen">${icon('trash')}</button></div></li>`).join('')
+          : '<li class="muted small pad">Noch keine Dokumente.</li>';
+      } catch (e) { list.innerHTML = `<li class="small bad pad">Dokumente konnten nicht geladen werden: ${esc(e.message)}</li>`; }
+    };
+    loadDocs();
+    $('#doc-input')?.addEventListener('change', async (e) => {
+      const sel = [...e.target.files]; e.target.value = '';
+      let ok = 0;
+      for (const f of sel) {
+        try { await files.add(id, f); ok++; } catch (err) { toast(esc(err.message), 4000); }
+      }
+      if (ok) { store.logActivity('Dokument hinzugefügt', `${c.name}: ${sel.map((f) => f.name).join(', ')}`); toast(`${ok} Datei(en) gespeichert`); }
+      loadDocs();
+    });
+    $('#doc-list')?.addEventListener('click', async (e) => {
+      const open = e.target.closest('[data-id]'), del = e.target.closest('[data-del]');
+      if (open) {
+        const f = await files.get(open.dataset.id);
+        if (!f) return;
+        const url = URL.createObjectURL(f.blob);
+        // iOS-Web-App: öffnet die Datei in der Vorschau (Teilen/Sichern dort möglich)
+        if (!window.open(url, '_blank')) location.href = url;
+        setTimeout(() => URL.revokeObjectURL(url), 120000);
+      } else if (del) {
+        const f = await files.get(del.dataset.del);
+        if (f && confirm(`„${f.name}“ löschen?`)) {
+          await files.remove(f.id);
+          store.logActivity('Dokument gelöscht', `${c.name}: ${f.name}`);
+          loadDocs();
+        }
+      }
+    });
     $('#hist-more')?.addEventListener('click', (e) => {
       const t = $('table.hist'); t.classList.toggle('show-all');
       e.target.textContent = t.classList.contains('show-all') ? 'Weniger anzeigen' : `Ältere Jahre anzeigen (${tl.length - 5})`;
     });
     $('#del-c').addEventListener('click', () => {
-      if (confirm(`Vertrag „${c.name}“ löschen?`)) { store.deleteContract(id); location.hash = '#/vertraege'; }
+      if (confirm(`Vertrag „${c.name}“ inkl. Dokumente löschen?`)) { files.removeForContract(id).catch(() => {}); store.deleteContract(id); location.hash = '#/vertraege'; }
     });
   });
   return `
@@ -535,6 +579,12 @@ function viewContract(id) {
         <p class="small muted">Legt einen Termin am letzten Kündigungstag an – mit Erinnerung 30, 7 und 1 Tag vorher.</p>`
         : c.active ? '<p class="small muted">Für eine Kündigungs-Erinnerung „Laufzeitende“ und „Kündigungsfrist“ unter „Bearbeiten“ eintragen.</p>' : ''}
       ${c.notes ? `<p class="small">${esc(c.notes)}</p>` : ''}
+    </section>
+    <section class="card span3"><div class="card-head"><h2>${icon('clip')} Dokumente</h2><span class="small muted" id="doc-count"></span></div>
+      <ul class="list docs" id="doc-list"><li class="muted small pad">Lädt…</li></ul>
+      <label class="drop file">${icon('upload')}<div><b>Datei hinzufügen</b><span class="small muted">Vertrag, Rechnung, Kündigungsbestätigung – PDF oder Foto, max. ${MAX_FILE_MB} MB</span></div>
+        <input type="file" id="doc-input" multiple accept="application/pdf,image/*,.pdf,.doc,.docx,.txt" hidden></label>
+      <p class="small muted">Dokumente bleiben auf diesem Gerät und sind in der Sicherung enthalten.</p>
     </section>
     <section class="card span3"><div class="card-head"><h2>Verlauf</h2></div>
       ${hasEst || taken.length ? `<div class="note-box">
@@ -715,14 +765,17 @@ function viewImport() {
         const p = pending;
         preview.innerHTML = `<div class="card">
           <h2>Vorschau</h2>
-          ${p.isBackup ? '<div class="insight warning">' + icon('warn') + '<div><b>Vollständige Sicherung</b><p>Beim Übernehmen werden alle aktuellen Daten ersetzt.</p></div></div>' : ''}
+          ${p.isBackup ? '<div class="insight warning">' + icon('warn') + `<div><b>Vollständige Sicherung</b><p>Beim Übernehmen werden alle aktuellen Daten ersetzt${p.raw.files?.length ? ` – inkl. ${p.raw.files.length} Dokument(en)` : ''}.</p></div></div>` : ''}
           ${p.statements.map((s) => `<div class="insight ${store.statement(s.year) ? 'warning' : 'good'}">${icon('doc')}<div><b>Abrechnung ${s.year}: ${eur(s.totals.costs)}</b><p>${s.positions.length} Positionen · Saldo ${eur(s.totals.balance)}${store.statement(s.year) ? ' · ersetzt vorhandene Abrechnung (alte Version bleibt im Verlauf)' : ''}</p></div></div>`).join('')}
           ${p.contracts.map((c) => `<div class="insight good">${icon('contract')}<div><b>Vertrag: ${esc(c.name)}</b><p>${esc(c.category)} · ${c.years.length} Jahr(e)</p></div></div>`).join('')}
           ${p.warnings.map((w) => `<div class="insight warning">${icon('warn')}<div><p>${esc(w)}</p></div></div>`).join('')}
           <div class="btn-row end"><button class="btn" id="imp-cancel">Abbrechen</button><button class="btn primary" id="imp-ok">Übernehmen</button></div></div>`;
         $('#imp-cancel').onclick = () => { pending = null; preview.innerHTML = ''; };
-        $('#imp-ok').onclick = () => {
-          if (p.isBackup) store.restore(p.raw);
+        $('#imp-ok').onclick = async () => {
+          if (p.isBackup) {
+            store.restore(p.raw);
+            try { await files.importAll(p.raw.files || []); } catch (e) { toast('Dokumente konnten nicht wiederhergestellt werden: ' + esc(e.message), 5000); }
+          }
           else {
             p.statements.forEach((s) => store.upsertStatement(s, src));
             p.contracts.forEach((c) => store.upsertContract(c));
@@ -774,8 +827,10 @@ const logItem = (a) => `<li><span class="muted small">${new Date(a.ts).toLocaleS
 function viewMore() {
   const s = store.get();
   afterRender.push(() => {
-    $('#exp').addEventListener('click', () => {
-      const blob = new Blob([JSON.stringify(store.backup(), null, 2)], { type: 'application/json' });
+    $('#exp').addEventListener('click', async () => {
+      const data = store.backup();
+      try { data.files = await files.exportAll(); } catch (e) { toast('Dokumente konnten nicht gesichert werden: ' + esc(e.message), 5000); data.files = []; }
+      const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
       const name = `nebenkostencheck-sicherung-${new Date().toISOString().slice(0, 10)}.json`;
       const file = new File([blob], name, { type: 'application/json' });
       store.logExport();
@@ -786,8 +841,9 @@ function viewMore() {
         setTimeout(() => URL.revokeObjectURL(a.href), 2000);
       }
     });
+    files.stats().then((x) => { $('#doc-stats').textContent = x.count ? `${x.count} (${fmtSize(x.bytes)})` : '0'; }).catch(() => { $('#doc-stats').textContent = '–'; });
     $('#reset').addEventListener('click', () => {
-      if (confirm('Wirklich ALLE Daten auf diesem Gerät löschen? Vorher besser eine Sicherung exportieren.')) { store.reset(); toast('Alle Daten gelöscht'); location.hash = '#/'; }
+      if (confirm('Wirklich ALLE Daten auf diesem Gerät löschen (inkl. Dokumente)? Vorher besser eine Sicherung exportieren.')) { files.clear().catch(() => {}); store.reset(); toast('Alle Daten gelöscht'); location.hash = '#/'; }
     });
     $('#copy-prompt').addEventListener('click', async () => {
       try { await navigator.clipboard.writeText($('#prompt').textContent); toast('Prompt kopiert'); }
@@ -799,8 +855,7 @@ function viewMore() {
     }).catch(() => { $('#prompt').textContent = 'Anleitung konnte nicht geladen werden (offline?).'; });
     $('#theme-seg').addEventListener('click', (e) => {
       const b = e.target.closest('button'); if (!b) return;
-      setTheme(b.dataset.k);
-      $('#theme-seg').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+      setTheme(b.dataset.k); // zeichnet die Seite neu – die Auswahl-Markierung kommt aus getTheme()
     });
     $('#upd').addEventListener('click', async () => {
       const reg = await navigator.serviceWorker?.getRegistration();
@@ -822,7 +877,7 @@ function viewMore() {
       </details>
     </section>
     <section class="card"><h2>Daten</h2>
-      <ul class="kv"><li><span>Abrechnungen</span><b>${s.statements.length}</b></li><li><span>Verträge</span><b>${s.contracts.length}</b></li></ul>
+      <ul class="kv"><li><span>Abrechnungen</span><b>${s.statements.length}</b></li><li><span>Verträge</span><b>${s.contracts.length}</b></li><li><span>Dokumente</span><b id="doc-stats">…</b></li></ul>
       <p class="small muted">Daten liegen nur auf diesem Gerät. Exportiere regelmäßig eine Sicherung (z. B. in iCloud Drive).</p>
       <div class="btn-row"><button class="btn primary" id="exp">Sicherung exportieren</button><a class="btn" href="#/import">Sicherung importieren</a></div>
       <button class="btn danger small-btn" id="reset">Alle Daten löschen</button>

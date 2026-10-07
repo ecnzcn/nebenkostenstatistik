@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.4.0 – 2026-10-07
+Dokumente (PDF/Fotos) zu Verträgen, in der Sicherung enthalten. Fix: Auswahl bei „Darstellung“ sofort sichtbar.
+
 ## 1.3.0 – 2026-10-07
 Prognose im Kostenverlauf, Kalender-Erinnerungen (Kündigung, Einwendungsfrist), Verträge mit Torte und Kategorienvergleich, Rückgängig für übernommene Schätzungen, Monatsbeträge im Formular, Theme-Schalter, Layout-Fixes, Vorbereitung native iOS-App (Schema, Golden-Tests, Swift-Modelle).
 

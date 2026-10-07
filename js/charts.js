@@ -75,7 +75,9 @@ export function barChart(el, { bars, unit = '', height = 200, color = 'var(--c1)
       ? `M${x0},${y0}V${y0 - bh + r}Q${x0},${y0 - bh} ${x0 + r},${y0 - bh}H${x0 + bw - r}Q${x0 + bw},${y0 - bh} ${x0 + bw},${y0 - bh + r}V${y0}Z`
       : '';
     const tip = b.tip || `<b>${esc(b.label)}</b><br>${(b.value || 0).toLocaleString('de-DE', { maximumFractionDigits: 2 })} ${unit}`;
-    svg += `<path d="${path}" fill="${b.color || color}"/>`;
+    svg += b.estimated
+      ? `<path d="${path}" fill="${b.color || color}" fill-opacity=".35" stroke="${b.color || color}" stroke-width="1.5" stroke-dasharray="4 3"/>`
+      : `<path d="${path}" fill="${b.color || color}"/>`;
     if (b.marker != null) {
       const my = pad.t + h - (h * b.marker) / max;
       svg += `<line x1="${cx - bw / 2 - 5}" x2="${cx + bw / 2 + 5}" y1="${my}" y2="${my}" stroke="var(--text)" stroke-width="2" stroke-dasharray="4 3"/>`;

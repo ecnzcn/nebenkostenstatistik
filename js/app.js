@@ -1,7 +1,7 @@
 import { APP_VERSION, CHANGELOG } from './version.js';
 import { store } from './store.js';
 import { GROUPS, CATEGORIES, CONTRACT_CATEGORIES, groupTotals, parseImport, normalizeContract, uid } from './model.js';
-import { kpis, analyze, eur, pct, numf, dateDe, tax35a, contractYear, rateContractYear, contractsYears, contractsTotal, noticeInfo } from './analysis.js';
+import { kpis, analyze, eur, pct, numf, dateDe, tax35a, contractYear, contractTimeline, rateContractYear, contractsYears, contractsTotal, contractsHasEstimate, noticeInfo } from './analysis.js';
 import { lineChart, barChart, donut, sparkline, installTooltip } from './charts.js';
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -368,7 +368,8 @@ function viewContracts() {
 
   afterRender.push(() => {
     if (years.length && $('#ch-ct')) {
-      barChart($('#ch-ct'), { bars: years.map((y) => ({ label: String(y), value: contractsTotal(cs, y) })), unit: '€', color: 'var(--c7)' });
+      barChart($('#ch-ct'), { bars: years.map((y) => ({ label: String(y), value: contractsTotal(cs, y), estimated: contractsHasEstimate(cs, y),
+        tip: `<b>${y}</b><br>${eur(contractsTotal(cs, y))}${contractsHasEstimate(cs, y) ? '<br>enthält geschätzte Werte' : ''}` })), unit: '€', color: 'var(--c7)' });
     }
   });
 
@@ -384,16 +385,17 @@ function viewContracts() {
   </section>
   ${notices.length ? `<section class="card"><div class="card-head"><h2>Kündigung bald möglich</h2></div>${notices.map(({ c, n }) => `<div class="insight warning">${icon('warn')}<div><b>${esc(c.name)}</b><p>Spätestens kündigen bis ${n.lastNotice.toLocaleDateString('de-DE')} (${n.days} Tage) – Laufzeitende ${n.end.toLocaleDateString('de-DE')}.</p></div></div>`).join('')}</section>` : ''}
   <div class="grid">
-    <section class="card span2"><div class="card-head"><h2>Vertragskosten pro Jahr</h2></div><div id="ch-ct" class="chart"></div></section>
+    <section class="card span2"><div class="card-head"><h2>Vertragskosten pro Jahr</h2>${years.some((y) => contractsHasEstimate(cs, y)) ? '<div class="legend"><span><i style="background:var(--c7)"></i>Erfasst</span><span><i class="est"></i>Enthält Schätzung</span></div>' : ''}</div><div id="ch-ct" class="chart"></div>
+      ${years.some((y) => contractsHasEstimate(cs, y)) ? '<p class="small muted">Für Jahre ohne Eintrag wird ab Vertragsbeginn mit dem Monatsbetrag des nächstgelegenen erfassten Jahres geschätzt.</p>' : ''}</section>
     <section class="card"><div class="card-head"><h2>Nach Kategorie ${year}</h2></div>
       <ul class="kv">${byCat.map((x) => `<li><span>${x.cat}</span><b>${eur(contractsTotal(x.items, year))}</b></li>`).join('')}</ul></section>
   </div>
   ${byCat.map((x) => `<section class="card"><div class="card-head"><h2>${x.cat}</h2></div><ul class="list big">${x.items.map((c) => {
-    const y = contractYear(c, year) || c.years[c.years.length - 1];
+    const y = contractYear(c, year) || contractTimeline(c).pop();
     const py = y ? contractYear(c, y.year - 1) : null;
     const r = rateContractYear(y);
     return `<li><a href="#/vertrag/${c.id}"><div class="grow"><b>${esc(c.name)}</b>${c.active ? '' : ' <span class="pill muted">beendet</span>'}<span class="small muted">${esc(y?.provider || c.provider)}${y?.tariff ? ' · ' + esc(y.tariff) : ''}</span></div>
-      <div class="r"><b>${y ? eur(y.cost) : '–'}</b><span class="small">${y ? y.year + ' ' : ''}${py ? delta(((y.cost - py.cost) / py.cost) * 100) : ''}</span>${r ? `<span class="badge ${r.level}">${icon(statusIcon[r.level])}${r.label}</span>` : ''}</div>${icon('chev')}</a></li>`;
+      <div class="r"><b>${y ? eur(y.cost) : '–'}</b><span class="small">${y ? y.year + (y.estimated ? ' (geschätzt) ' : ' ') : ''}${py ? delta(((y.cost - py.cost) / py.cost) * 100) : ''}</span>${r ? `<span class="badge ${r.level}">${icon(statusIcon[r.level])}${r.label}</span>` : ''}</div>${icon('chev')}</a></li>`;
   }).join('')}</ul></section>`).join('')}
   ` : `<section class="card hero">${icon('contract', 'big')}<h2>Noch keine Verträge</h2>
     <p>Erfasse Versicherungen, Handy, Strom, Internet & Co. mit den Kosten pro Jahr. Trage optional das günstigste Vergleichsangebot ein – dann siehst du, wie gut deine Wahl war.</p>
@@ -405,14 +407,21 @@ function viewContract(id) {
   if (!c) return `<p class="pad">Vertrag nicht gefunden. <a href="#/vertraege">Zurück</a></p>`;
   const n = noticeInfo(c);
   const totalOver = c.years.reduce((s, y) => s + (y.benchmark != null ? y.cost - y.benchmark : 0), 0);
+  const tl = contractTimeline(c);
+  const hasEst = tl.some((y) => y.estimated);
   afterRender.push(() => {
-    if (c.years.length) {
-      barChart($('#ch-c'), { bars: c.years.map((y) => {
+    if (tl.length) {
+      barChart($('#ch-c'), { bars: tl.map((y) => {
         const r = rateContractYear(y);
-        return { label: String(y.year), value: y.cost, marker: y.benchmark,
-          tip: `<b>${y.year}</b><br>Bezahlt: ${eur(y.cost)}${y.benchmark != null ? `<br>Günstigstes Angebot: ${eur(y.benchmark)}<br>${r.label} (${pct(r.p)})` : ''}` };
+        return { label: String(y.year), value: y.cost, marker: y.benchmark, estimated: y.estimated,
+          tip: `<b>${y.year}</b>${y.estimated ? ' (geschätzt)' : ''}<br>${y.estimated ? 'Geschätzt' : 'Bezahlt'}: ${eur(y.cost)}${y.benchmark != null ? `<br>Günstigstes Angebot: ${eur(y.benchmark)}<br>${r.label} (${pct(r.p)})` : ''}` };
       }), unit: '€', color: 'var(--c7)' });
     }
+    $('#take-est')?.addEventListener('click', () => {
+      const est = tl.filter((y) => y.estimated).map(({ estimated, months, note, ...y }) => ({ ...y, note: 'aus Schätzung übernommen' }));
+      store.replaceContract({ ...c, years: [...c.years, ...est].sort((a, b) => a.year - b.year) });
+      toast(`${est.length} Jahr(e) übernommen`); render();
+    });
     $('#del-c').addEventListener('click', () => {
       if (confirm(`Vertrag „${c.name}“ löschen?`)) { store.deleteContract(id); location.hash = '#/vertraege'; }
     });
@@ -421,8 +430,8 @@ function viewContract(id) {
   <header class="page-head"><div><a class="back" href="#/vertraege">${icon('back')} Verträge</a><h1>${esc(c.name)}</h1><p class="sub">${esc(c.category)}${c.provider ? ' · ' + esc(c.provider) : ''}</p></div>
     <a class="btn" href="#/vertrag/${c.id}/bearbeiten">Bearbeiten</a></header>
   <div class="grid">
-    <section class="card span2"><div class="card-head"><h2>Kosten pro Jahr</h2>${c.years.some((y) => y.benchmark != null) ? '<div class="legend"><span><i style="background:var(--c7)"></i>Bezahlt</span><span><i class="dash"></i>Günstigstes Angebot</span></div>' : ''}</div>
-      ${c.years.length ? '<div id="ch-c" class="chart"></div>' : '<p class="muted">Noch keine Jahreswerte. Unter „Bearbeiten“ hinzufügen.</p>'}</section>
+    <section class="card span2"><div class="card-head"><h2>Kosten pro Jahr</h2>${c.years.some((y) => y.benchmark != null) || hasEst ? `<div class="legend"><span><i style="background:var(--c7)"></i>Bezahlt</span>${hasEst ? '<span><i class="est"></i>Geschätzt</span>' : ''}${c.years.some((y) => y.benchmark != null) ? '<span><i class="dash"></i>Günstigstes Angebot</span>' : ''}</div>` : ''}</div>
+      ${tl.length ? '<div id="ch-c" class="chart"></div>' : '<p class="muted">Noch keine Jahreswerte. Unter „Bearbeiten“ hinzufügen.</p>'}</section>
     <section class="card"><div class="card-head"><h2>Bewertung</h2></div>
       ${c.years.some((y) => y.benchmark != null)
         ? `<p>${totalOver > 0 ? `Über alle Jahre hast du <b class="bad">${eur(totalOver)}</b> mehr bezahlt als beim jeweils günstigsten Angebot.` : `Über alle Jahre lagst du <b class="good">${eur(-totalOver)}</b> unter dem Vergleichsangebot. Gut gewählt!`}</p>`
@@ -437,12 +446,13 @@ function viewContract(id) {
       </ul>
       ${c.notes ? `<p class="small">${esc(c.notes)}</p>` : ''}
     </section>
-    <section class="card span3"><div class="card-head"><h2>Verlauf</h2></div>
+    <section class="card span3"><div class="card-head"><h2>Verlauf</h2>${hasEst ? '<button class="btn small-btn" id="take-est" style="margin:0">Schätzungen als erfasst übernehmen</button>' : ''}</div>
+      ${hasEst ? '<p class="small muted">Jahre ohne Eintrag werden ab Vertragsbeginn geschätzt. Übernimm sie oder trage die echten Beträge unter „Bearbeiten“ ein.</p>' : ''}
       <table class="tbl"><thead><tr><th>Jahr</th><th class="hide-s">Anbieter / Tarif</th><th class="r">Kosten</th><th class="r">Δ Vorjahr</th><th class="r">Vergleich</th></tr></thead>
-      <tbody>${c.years.slice().reverse().map((y) => {
+      <tbody>${tl.slice().reverse().map((y) => {
         const py = contractYear(c, y.year - 1), r = rateContractYear(y);
-        return `<tr><td><b>${y.year}</b>${y.note ? `<div class="small muted">${esc(y.note)}</div>` : ''}</td><td class="hide-s">${esc(y.provider || c.provider)}${y.tariff ? '<div class="small muted">' + esc(y.tariff) + '</div>' : ''}</td>
-          <td class="r">${eur(y.cost)}<div class="small muted">${eur(y.cost / 12)}/Monat</div></td><td class="r">${py ? delta(((y.cost - py.cost) / py.cost) * 100) : '–'}</td>
+        return `<tr class="${y.estimated ? 'est-row' : ''}"><td><b>${y.year}</b>${y.estimated ? ' <span class="pill muted">geschätzt</span>' : ''}${y.note ? `<div class="small muted">${esc(y.note)}</div>` : ''}</td><td class="hide-s">${esc(y.provider || c.provider)}${y.tariff ? '<div class="small muted">' + esc(y.tariff) + '</div>' : ''}</td>
+          <td class="r">${eur(y.cost)}<div class="small muted">${eur(y.cost / (y.months || 12))}/Monat</div></td><td class="r">${py ? delta(((y.cost - py.cost) / py.cost) * 100) : '–'}</td>
           <td class="r">${r ? `<span class="badge ${r.level}">${icon(statusIcon[r.level])}${r.label}</span><div class="small muted">${eur(y.benchmark)}${y.benchmarkNote ? ' · ' + esc(y.benchmarkNote) : ''}</div>` : '–'}</td></tr>`;
       }).join('')}</tbody></table>
       <button class="btn danger small-btn" id="del-c">Vertrag löschen</button>
@@ -508,7 +518,7 @@ function viewContractEdit(id) {
       <label class="check"><input type="checkbox" name="active" ${c.active ? 'checked' : ''}> Vertrag läuft noch</label>
     </div>
     <h2>Kosten pro Jahr</h2>
-    <p class="small muted">Entweder Jahreskosten oder Monatsbetrag (wird ×12 gerechnet). „Günstigstes Angebot“ = was du im selben Jahr woanders bezahlt hättest.</p>
+    <p class="small muted">Entweder Jahreskosten oder Monatsbetrag (wird ×12 gerechnet). Jahre ohne Eintrag schätzt die App ab „Beginn“ automatisch. „Günstigstes Angebot“ = was du im selben Jahr woanders bezahlt hättest.</p>
     <div id="years">${(c.years.length ? c.years : [{}]).map(yearRow).join('')}</div>
     <button type="button" class="btn" id="add-year">${icon('plus')} Jahr hinzufügen</button>
     <div class="btn-row end"><a class="btn" href="${id ? '#/vertrag/' + id : '#/vertraege'}">Abbrechen</a><button class="btn primary">Speichern</button></div>
@@ -522,7 +532,8 @@ function viewStats() {
   const cats = Object.keys(CATEGORIES).filter((k) => sts.some((s) => s.positions.some((p) => p.category === k)));
   const catSum = (s, k) => s.positions.filter((p) => p.category === k).reduce((a, p) => a + p.amount, 0);
   const cs = store.contracts();
-  const allYears = [...new Set([...sts.map((s) => s.year), ...contractsYears(cs)])].sort();
+  const ys = [...sts.map((s) => s.year), ...contractsYears(cs)];
+  const allYears = ys.length ? Array.from({ length: Math.max(...ys) - Math.min(...ys) + 1 }, (_, i) => Math.min(...ys) + i) : [];
   afterRender.push(() => {
     lineChart($('#ch-s1'), { labels: sts.map((s) => String(s.year)), unit: '€/m²', series: [
       { name: 'Kosten pro m²', color: 'var(--c3)', values: sts.map((s) => (s.unit.livingArea ? s.totals.costs / s.unit.livingArea : null)) },
@@ -550,8 +561,9 @@ function viewStats() {
     ${cs.length ? `<section class="card span3"><div class="card-head"><h2>Gesamte Fixkosten (Nebenkosten + Verträge)</h2></div>
       <div class="scroll-x"><table class="tbl"><thead><tr><th></th>${allYears.map((y) => `<th class="r">${y}</th>`).join('')}</tr></thead><tbody>
       <tr><td>Nebenkosten</td>${allYears.map((y) => `<td class="r">${store.statement(y) ? eur(store.statement(y).totals.costs) : '–'}</td>`).join('')}</tr>
-      <tr><td>Verträge</td>${allYears.map((y) => `<td class="r">${eur(contractsTotal(cs, y))}</td>`).join('')}</tr></tbody>
-      <tfoot><tr><td>Summe</td>${allYears.map((y) => `<td class="r">${eur((store.statement(y)?.totals.costs || 0) + contractsTotal(cs, y))}</td>`).join('')}</tr></tfoot></table></div></section>` : ''}
+      <tr><td>Verträge</td>${allYears.map((y) => `<td class="r">${eur(contractsTotal(cs, y))}${contractsHasEstimate(cs, y) ? '*' : ''}</td>`).join('')}</tr></tbody>
+      <tfoot><tr><td>Summe</td>${allYears.map((y) => `<td class="r">${eur((store.statement(y)?.totals.costs || 0) + contractsTotal(cs, y))}</td>`).join('')}</tr></tfoot></table></div>
+      ${allYears.some((y) => contractsHasEstimate(cs, y)) ? '<p class="small muted">* enthält geschätzte Vertragskosten (ab Vertragsbeginn)</p>' : ''}</section>` : ''}
   </div>`;
 }
 
@@ -620,6 +632,8 @@ function viewImport() {
 }
 
 // ---------- Mehr ----------
+const logItem = (a) => `<li><span class="muted small">${new Date(a.ts).toLocaleString('de-DE')}</span><b>${esc(a.action)}</b><span class="small">${esc(a.detail)}</span></li>`;
+
 function viewMore() {
   const s = store.get();
   afterRender.push(() => {
@@ -676,11 +690,13 @@ function viewMore() {
       <p class="small muted">Danach startet die App im Vollbild und funktioniert offline.</p>
       <button class="btn" id="upd">Nach Update suchen</button>
     </section>
-    <section class="card"><h2>Versionen & Änderungen</h2>
-      ${CHANGELOG.map((v) => `<div class="ver"><div><b>v${v.version}</b> <span class="muted small">${dateDe(v.date)}</span>${v.version === APP_VERSION ? ' <span class="pill">aktuell</span>' : ''}</div><p class="small"><b>${esc(v.title)}</b></p><ul class="small">${v.changes.map((c) => `<li>${esc(c)}</li>`).join('')}</ul></div>`).join('')}
-    </section>
-    <section class="card span3"><h2>Änderungsprotokoll deiner Daten</h2>
-      ${s.activity.length ? `<ul class="log">${s.activity.slice(0, 50).map((a) => `<li><span class="muted small">${new Date(a.ts).toLocaleString('de-DE')}</span><b>${esc(a.action)}</b><span class="small">${esc(a.detail)}</span></li>`).join('')}</ul>` : '<p class="muted">Noch keine Änderungen.</p>'}
+    <section class="card"><details class="fold"><summary><h2>Versionen & Änderungen</h2><span class="small muted">v${APP_VERSION} · ${CHANGELOG.length} ${CHANGELOG.length === 1 ? 'Version' : 'Versionen'}</span>${icon('chev', 'fold-ic')}</summary>
+      ${CHANGELOG.map((v, i) => `<details class="ver" ${i === 0 ? 'open' : ''}><summary><b>v${v.version}</b> <span class="muted small">${dateDe(v.date)}</span>${v.version === APP_VERSION ? ' <span class="pill">aktuell</span>' : ''}<span class="small grow"> ${esc(v.title)}</span>${icon('chev', 'fold-ic')}</summary><ul class="small">${v.changes.map((c) => `<li>${esc(c)}</li>`).join('')}</ul></details>`).join('')}
+    </details></section>
+    <section class="card span3"><details class="fold"><summary><h2>Änderungsprotokoll deiner Daten</h2><span class="small muted">${s.activity.length} ${s.activity.length === 1 ? 'Eintrag' : 'Einträge'}${s.activity[0] ? ' · zuletzt ' + new Date(s.activity[0].ts).toLocaleDateString('de-DE') : ''}</span>${icon('chev', 'fold-ic')}</summary>
+      ${s.activity.length ? `<ul class="log">${s.activity.slice(0, 10).map(logItem).join('')}</ul>
+        ${s.activity.length > 10 ? `<details class="more-log"><summary class="link">Ältere anzeigen (${s.activity.length - 10})</summary><ul class="log">${s.activity.slice(10).map(logItem).join('')}</ul></details>` : ''}` : '<p class="muted">Noch keine Änderungen.</p>'}
+    </details>
     </section>
   </div>`;
 }

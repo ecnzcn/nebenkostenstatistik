@@ -309,3 +309,32 @@ details[open] summary { margin-bottom: 10px; }
 .toast a { color: inherit; text-decoration: underline; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
 @media (min-width: 900px) { .toast { bottom: 24px; } }
+
+/* ---------- v1.1 ---------- */
+/* Sparkline oben rechts statt in der Fußzeile (ragte auf schmalen Displays heraus) */
+.kpi { position: relative; overflow: hidden; }
+.kpi .spark { position: absolute; top: 16px; right: 14px; display: block; }
+.kpi-foot { min-height: 0; }
+.kpi-label { padding-right: 4px; }
+
+/* iOS: Datumsfelder ignorieren sonst width:100% und ragen heraus */
+.form label, .fgrid > *, .yrow > * { min-width: 0; }
+input[type="date"] {
+  -webkit-appearance: none; appearance: none;
+  display: block; min-width: 0; max-width: 100%; min-height: 46px; text-align: left;
+}
+input[type="date"]::-webkit-date-and-time-value { text-align: left; }
+
+/* Aufklappbare Bereiche */
+.fold > summary { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 32px; }
+.fold > summary h2 { margin: 0; }
+.fold > summary .fold-ic, .ver > summary .fold-ic { margin-left: auto; color: var(--muted); width: 18px; height: 18px; transition: transform .2s; }
+.fold[open] > summary .fold-ic, .ver[open] > summary .fold-ic { transform: rotate(90deg); }
+.fold[open] > summary { margin-bottom: 8px; }
+.ver > summary { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 40px; }
+.ver > summary .grow { color: var(--text-2); }
+.more-log > summary { padding: 10px 0; }
+
+/* Geschätzte Vertragsjahre */
+.legend i.est { background: color-mix(in srgb, var(--c7) 35%, transparent); border: 1.5px dashed var(--c7); border-radius: 3px; }
+.tbl tr.est-row td { color: var(--text-2); }

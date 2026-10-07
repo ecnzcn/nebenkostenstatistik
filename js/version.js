@@ -2,10 +2,22 @@
 // Bei jeder Änderung: APP_VERSION erhöhen, Eintrag oben in CHANGELOG ergänzen
 // und CACHE_VERSION in sw.js angleichen (sonst sieht das iPhone die neue Version nicht).
 
-export const APP_VERSION = '1.0.0';
+export const APP_VERSION = '1.1.0';
 export const DATA_FORMAT_VERSION = 1;
 
 export const CHANGELOG = [
+  {
+    version: '1.1.0',
+    date: '2026-10-07',
+    title: 'Verträge über Jahre & Feinschliff',
+    changes: [
+      'Verträge zählen ab Vertragsbeginn in jedes Jahr – fehlende Jahre werden aus dem Monatsbetrag geschätzt und markiert',
+      'Schätzungen lassen sich mit einem Tipp als erfasste Werte übernehmen',
+      'Statistik „Gesamte Fixkosten“ zeigt alle Jahre lückenlos',
+      'Versionen & Änderungen sowie das Änderungsprotokoll sind jetzt aufklappbar',
+      'Behoben: Sparkline ragte aus den Kennzahl-Kacheln, Datumsfelder ragten auf dem iPhone aus dem Formular',
+    ],
+  },
   {
     version: '1.0.0',
     date: '2026-10-06',

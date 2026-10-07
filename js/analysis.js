@@ -168,7 +168,42 @@ export function tax35a(st) {
 }
 
 // --- Verträge ---
-export function contractYear(c, year) { return c.years.find((y) => y.year === year); }
+const r2 = (n) => Math.round(n * 100) / 100;
+
+// Aktive Monate eines Vertrags im Jahr (1–12), anhand Beginn und – bei beendeten Verträgen – Ende.
+function monthsActive(c, year) {
+  const start = c.startDate ? new Date(c.startDate + 'T12:00:00') : null;
+  const end = !c.active && c.endDate ? new Date(c.endDate + 'T12:00:00') : null;
+  let from = 0, to = 11;
+  if (start) { if (start.getFullYear() > year) return 0; if (start.getFullYear() === year) from = start.getMonth(); }
+  if (end) { if (end.getFullYear() < year) return 0; if (end.getFullYear() === year) to = end.getMonth(); }
+  return Math.max(0, to - from + 1);
+}
+
+// Erfasste Jahre + geschätzte Jahre seit Vertragsbeginn (Monatsbetrag aus dem nächstgelegenen erfassten Jahr).
+export function contractTimeline(c) {
+  const explicit = c.years.map((y) => ({ ...y, estimated: false }));
+  if (!c.startDate || !explicit.length) return explicit;
+  const startY = new Date(c.startDate + 'T12:00:00').getFullYear();
+  const curY = new Date().getFullYear();
+  const endY = !c.active && c.endDate ? Math.min(curY, new Date(c.endDate + 'T12:00:00').getFullYear()) : curY;
+  const have = new Set(explicit.map((y) => y.year));
+  const out = [...explicit];
+  for (let y = startY; y <= endY; y++) {
+    if (have.has(y)) continue;
+    const months = monthsActive(c, y);
+    if (!months) continue;
+    const earlier = explicit.filter((e) => e.year < y).pop();
+    const ref = earlier || explicit.find((e) => e.year > y);
+    const refMonths = monthsActive(c, ref.year) || 12;
+    const monthly = ref.cost / refMonths;
+    out.push({ year: y, cost: r2(monthly * months), tariff: ref.tariff, provider: ref.provider, benchmark: null,
+      benchmarkNote: '', note: months < 12 ? `${months} Monate` : '', estimated: true, months });
+  }
+  return out.sort((a, b) => a.year - b.year);
+}
+
+export function contractYear(c, year) { return contractTimeline(c).find((y) => y.year === year); }
 
 export function rateContractYear(y) {
   if (!y || y.benchmark == null || !y.cost) return null;
@@ -181,12 +216,16 @@ export function rateContractYear(y) {
 
 export function contractsYears(contracts) {
   const s = new Set();
-  contracts.forEach((c) => c.years.forEach((y) => s.add(y.year)));
+  contracts.forEach((c) => contractTimeline(c).forEach((y) => s.add(y.year)));
   return [...s].sort((a, b) => a - b);
 }
 
 export function contractsTotal(contracts, year) {
   return contracts.reduce((a, c) => a + (contractYear(c, year)?.cost || 0), 0);
+}
+
+export function contractsHasEstimate(contracts, year) {
+  return contracts.some((c) => contractYear(c, year)?.estimated);
 }
 
 // Nächstmöglicher Kündigungstermin

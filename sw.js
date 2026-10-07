@@ -1,5 +1,5 @@
 // Offline-Cache. CACHE_VERSION bei jedem Release erhöhen (= APP_VERSION in js/version.js).
-const CACHE_VERSION = '1.0.0';
+const CACHE_VERSION = '1.1.0';
 const CACHE = 'nebenkostencheck-' + CACHE_VERSION;
 const ASSETS = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',

@@ -1,0 +1,442 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ecnzcn.github.io/nebenkostenstatistik/docs/schema/nebenkostencheck.schema.json",
+  "title": "NebenkostenCheck Import/Backup (formatVersion 1)",
+  "description": "Gemeinsamer Datenvertrag für Web-App, Claude-Import und eine spätere native iOS-App.",
+  "type": "object",
+  "properties": {
+    "format": {
+      "enum": [
+        "nebenkostencheck",
+        "nebenkostencheck-backup"
+      ]
+    },
+    "formatVersion": {
+      "const": 1
+    },
+    "statements": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Statement"
+      }
+    },
+    "contracts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Contract"
+      }
+    },
+    "files": {
+      "type": "array",
+      "description": "Nur in Sicherungen: Dokumente zu Verträgen (Base64)",
+      "items": {
+        "$ref": "#/$defs/Attachment"
+      }
+    }
+  },
+  "$defs": {
+    "Date": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "Euro": {
+      "type": "number"
+    },
+    "Category": {
+      "enum": [
+        "heizung",
+        "warmwasser",
+        "wasser",
+        "hausmeister",
+        "reinigung",
+        "garten",
+        "grundsteuer",
+        "muell",
+        "versicherung",
+        "strom",
+        "aufzug",
+        "kabel",
+        "wartung",
+        "stellplatz",
+        "sonstiges"
+      ]
+    },
+    "Position": {
+      "type": "object",
+      "required": [
+        "label",
+        "category",
+        "amount"
+      ],
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "category": {
+          "$ref": "#/$defs/Category"
+        },
+        "amount": {
+          "$ref": "#/$defs/Euro",
+          "description": "Anteil des Mieters"
+        },
+        "buildingTotal": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Gesamtbetrag des Hauses"
+        },
+        "allocationKey": {
+          "type": "string"
+        },
+        "share": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "Statement": {
+      "type": "object",
+      "required": [
+        "year",
+        "positions"
+      ],
+      "properties": {
+        "year": {
+          "type": "integer",
+          "minimum": 1990,
+          "maximum": 2100
+        },
+        "periodFrom": {
+          "$ref": "#/$defs/Date"
+        },
+        "periodTo": {
+          "$ref": "#/$defs/Date"
+        },
+        "usageFrom": {
+          "$ref": "#/$defs/Date"
+        },
+        "usageTo": {
+          "$ref": "#/$defs/Date"
+        },
+        "issuedOn": {
+          "$ref": "#/$defs/Date"
+        },
+        "receivedOn": {
+          "$ref": "#/$defs/Date"
+        },
+        "dueOn": {
+          "$ref": "#/$defs/Date"
+        },
+        "issuer": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "livingArea": {
+              "type": "number"
+            },
+            "meaShare": {
+              "type": "number"
+            },
+            "meaTotal": {
+              "type": "number"
+            }
+          }
+        },
+        "positions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/Position"
+          }
+        },
+        "totals": {
+          "type": "object",
+          "properties": {
+            "costs": {
+              "type": "number"
+            },
+            "prepayments": {
+              "type": "number"
+            },
+            "balance": {
+              "type": "number",
+              "description": "prepayments − costs; negativ = Nachzahlung"
+            }
+          }
+        },
+        "prepaymentSchedule": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "months",
+              "monthly"
+            ],
+            "properties": {
+              "months": {
+                "type": "integer"
+              },
+              "monthly": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "consumption": {
+          "type": "object",
+          "properties": {
+            "heatingKwh": {
+              "type": "number"
+            },
+            "hotWaterM3": {
+              "type": "number"
+            },
+            "hotWaterKwh": {
+              "type": "number"
+            },
+            "coldWaterM3": {
+              "type": "number"
+            },
+            "waterTotalM3": {
+              "type": "number"
+            },
+            "heatingKwhPerM2": {
+              "type": "number"
+            },
+            "heatingKwhPerM2Building": {
+              "type": "number"
+            },
+            "hotWaterKwhPerM2": {
+              "type": "number"
+            },
+            "hotWaterKwhPerM2Building": {
+              "type": "number"
+            },
+            "co2CostTenant": {
+              "type": "number"
+            },
+            "energyPricePerKwh": {
+              "type": "number"
+            }
+          }
+        },
+        "consumptionHistory": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "year"
+            ],
+            "properties": {
+              "year": {
+                "type": "integer"
+              },
+              "heatingKwh": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "hotWaterKwh": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "waterTotalM3": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "tax35a": {
+          "type": "object",
+          "properties": {
+            "householdServices": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "craftsmenServices": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ContractYear": {
+      "type": "object",
+      "required": [
+        "year"
+      ],
+      "properties": {
+        "year": {
+          "type": "integer"
+        },
+        "cost": {
+          "type": "number",
+          "description": "Kosten im Kalenderjahr"
+        },
+        "monthly": {
+          "type": "number",
+          "description": "Alternativ zu cost: wird × 12 gerechnet"
+        },
+        "tariff": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "benchmark": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Günstigstes Angebot pro Jahr"
+        },
+        "benchmarkMonthly": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Alternativ: pro Monat, wird × 12 gerechnet"
+        },
+        "benchmarkNote": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        },
+        "fromEstimate": {
+          "type": "boolean",
+          "description": "Aus einer Schätzung übernommen (rückgängig machbar)"
+        }
+      }
+    },
+    "Contract": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "category": {
+          "enum": [
+            "Versicherung",
+            "Handy",
+            "Internet",
+            "Strom",
+            "Gas",
+            "Streaming",
+            "Rundfunk",
+            "Fitness",
+            "Auto",
+            "Bank",
+            "Software",
+            "Sonstiges"
+          ]
+        },
+        "provider": {
+          "type": "string"
+        },
+        "contractNo": {
+          "type": "string"
+        },
+        "startDate": {
+          "$ref": "#/$defs/Date"
+        },
+        "endDate": {
+          "$ref": "#/$defs/Date"
+        },
+        "noticePeriodMonths": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "autoRenewMonths": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "years": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ContractYear"
+          }
+        }
+      }
+    },
+    "Attachment": {
+      "type": "object",
+      "required": [
+        "id",
+        "contractId",
+        "name",
+        "data"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "contractId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "description": "MIME-Typ"
+        },
+        "size": {
+          "type": "integer"
+        },
+        "addedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "data": {
+          "type": "string",
+          "contentEncoding": "base64"
+        }
+      }
+    }
+  }
+}
